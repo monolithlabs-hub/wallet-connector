@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "Solana wallet-connect monorepo (@opindex/wallet-connect)",
-  "packageManager": "pnpm@10.33.4",
+  "packageManager": "pnpm@11.0.8",
   "engines": {
     "node": ">=18.18"
   },
@@ -15,6 +15,6 @@
   },
   "devDependencies": {
     "turbo": "^2.9.10",
-    "typescript": "^5.5.3"
+    "typescript": "^6.0.3"
   }
 }

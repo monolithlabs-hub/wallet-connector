@@ -6,6 +6,6 @@
     "build": "echo \"[core] build placeholder — see TASK-003\"",
     "test": "echo \"[core] test placeholder — see TASK-004\"",
     "lint": "echo \"[core] lint placeholder — see TASK-005\"",
-    "typecheck": "echo \"[core] typecheck placeholder — see TASK-002\""
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   }
 }
