@@ -25,7 +25,7 @@
   "scripts": {
     "build": "tsup",
     "test": "vitest run --coverage",
-    "lint": "echo \"[core] lint placeholder — see TASK-005\"",
+    "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "peerDependencies": {

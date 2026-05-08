@@ -4,5 +4,5 @@ packages:
 allowBuilds:
   bufferutil: false
   esbuild: true
+  unrs-resolver: true
   utf-8-validate: false
-
