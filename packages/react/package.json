@@ -24,7 +24,7 @@
   "sideEffects": false,
   "scripts": {
     "build": "tsup",
-    "test": "echo \"[react] test placeholder — see TASK-004\"",
+    "test": "vitest run --coverage",
     "lint": "echo \"[react] lint placeholder — see TASK-005\"",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
