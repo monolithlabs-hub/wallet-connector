@@ -1,0 +1,15 @@
+{
+  "name": "@opindex/wallet-connect-vue",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "echo \"[vue] build placeholder — see TASK-003\"",
+    "test": "echo \"[vue] test placeholder — see TASK-004\"",
+    "lint": "echo \"[vue] lint placeholder — see TASK-005\"",
+    "typecheck": "echo \"[vue] typecheck placeholder — see TASK-002\""
+  },
+  "dependencies": {
+    "@opindex/wallet-connect-core": "workspace:*",
+    "@opindex/wallet-connect-ui": "workspace:*"
+  }
+}
