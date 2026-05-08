@@ -2,8 +2,28 @@
   "name": "@opindex/wallet-connect-react",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
   "scripts": {
-    "build": "echo \"[react] build placeholder — see TASK-003\"",
+    "build": "tsup",
     "test": "echo \"[react] test placeholder — see TASK-004\"",
     "lint": "echo \"[react] lint placeholder — see TASK-005\"",
     "typecheck": "tsc --noEmit -p tsconfig.json"
@@ -11,5 +31,8 @@
   "dependencies": {
     "@opindex/wallet-connect-core": "workspace:*",
     "@opindex/wallet-connect-ui": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=18"
   }
 }
