@@ -19,6 +19,9 @@ export {
   WalletWindowClosedError,
 } from './errors'
 
+export { detectPlatform } from './platform/detector'
+export type { PlatformInfo, PlatformStrategy } from './platform/detector'
+
 export { WalletReadyState } from './ready-state'
 
 export { asWalletName, type WalletName } from './wallet-name'
