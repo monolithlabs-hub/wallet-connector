@@ -11,17 +11,13 @@ Source project: [`anza-xyz/wallet-adapter`](https://github.com/anza-xyz/wallet-a
 License: Apache-2.0
 Upstream license file: <https://github.com/anza-xyz/wallet-adapter/blob/master/LICENSE>
 
-| File in this repo                  | Ported from (upstream path)                                       |
-| ---------------------------------- | ----------------------------------------------------------------- |
-| `packages/core/src/errors.ts`      | `packages/core/base/src/errors.ts`                                |
-| `packages/core/src/ready-state.ts` | `packages/core/base/src/adapter.ts` (the `WalletReadyState` enum) |
-| `packages/core/src/wallet-name.ts` | `packages/core/base/src/types.ts` (the `WalletName` branded type) |
-
-When TASK-107 lands, this table will gain an entry for
-`packages/core/src/adapters/standard-wallet-adapter.ts` (ported from
-`packages/wallet-standard/wallet-adapter-base/src/wallet.ts`) and for
-`packages/core/src/discovery.ts` (the `isWalletAdapterCompatibleStandardWallet`
-helper, ported from the same upstream package).
+| File in this repo                                       | Ported from (upstream path)                                                                                |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `packages/core/src/errors.ts`                           | `packages/core/base/src/errors.ts`                                                                         |
+| `packages/core/src/ready-state.ts`                      | `packages/core/base/src/adapter.ts` (the `WalletReadyState` enum)                                          |
+| `packages/core/src/wallet-name.ts`                      | `packages/core/base/src/types.ts` (the `WalletName` branded type)                                          |
+| `packages/core/src/adapters/standard-wallet-adapter.ts` | `packages/wallet-standard/wallet-adapter-base/src/wallet.ts` (StandardWalletAdapter, scope-trimmed)        |
+| `packages/core/src/discovery.ts`                        | `packages/wallet-standard/wallet-adapter-base/src/standard.ts` (`isWalletAdapterCompatibleStandardWallet`) |
 
 The full text of the Apache License, Version 2.0 is available at
 <http://www.apache.org/licenses/LICENSE-2.0>.

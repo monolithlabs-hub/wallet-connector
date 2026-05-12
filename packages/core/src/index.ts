@@ -38,6 +38,17 @@ export type {
   SolanaCluster,
 } from './adapters/deep-link-builder'
 
+export { createStandardWalletAdapter } from './adapters/standard-wallet-adapter'
+export type {
+  StandardAdapterEvent,
+  StandardAdapterListener,
+  StandardAdapterUnsubscribe,
+  StandardWalletAdapter,
+} from './adapters/standard-wallet-adapter'
+
+export { discoverStandardWallets } from './discovery'
+export type { DiscoveryHandle, DiscoveryListener, DiscoveryUnsubscribe } from './discovery'
+
 export { detectPlatform } from './platform/detector'
 export type { PlatformInfo, PlatformStrategy } from './platform/detector'
 
