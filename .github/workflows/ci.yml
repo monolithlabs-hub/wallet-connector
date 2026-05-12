@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  ci:
+    name: CI / Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify changeset status
+        if: github.event_name == 'pull_request'
+        run: pnpm changeset status --since=origin/${{ github.base_ref }}
+
+      - name: Typecheck
+        run: pnpm turbo typecheck
+
+      - name: Lint
+        run: pnpm turbo lint
+
+      - name: Build
+        run: pnpm turbo build
+
+      - name: Test (with coverage)
+        run: pnpm turbo test
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-node-${{ matrix.node }}
+          path: packages/*/coverage/
+          if-no-files-found: ignore
+          retention-days: 14

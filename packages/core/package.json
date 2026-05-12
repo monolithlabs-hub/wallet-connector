@@ -2,10 +2,46 @@
   "name": "@opindex/wallet-connect-core",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "NOTICE",
+    "THIRD_PARTY_LICENSES.md"
+  ],
+  "sideEffects": false,
   "scripts": {
-    "build": "echo \"[core] build placeholder — see TASK-003\"",
-    "test": "echo \"[core] test placeholder — see TASK-004\"",
-    "lint": "echo \"[core] lint placeholder — see TASK-005\"",
-    "typecheck": "echo \"[core] typecheck placeholder — see TASK-002\""
+    "build": "tsup",
+    "test": "vitest run --coverage",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@solana/wallet-standard-features": "^1.3.0",
+    "@wallet-standard/app": "^1.1.0",
+    "@wallet-standard/base": "^1.1.0",
+    "@wallet-standard/features": "^1.1.0"
+  },
+  "peerDependencies": {
+    "@solana/web3.js": "^1.98.0"
+  },
+  "peerDependenciesMeta": {
+    "@solana/web3.js": {
+      "optional": false
+    }
   }
 }
