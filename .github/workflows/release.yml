@@ -8,9 +8,6 @@ concurrency:
   group: release
   cancel-in-progress: false
 
-# Requires Changesets to be initialized (TASK-007).
-# Until `.changeset/config.json` and `@changesets/cli` exist, the changesets
-# step below will exit early with no version PR / publish.
 jobs:
   release:
     name: Release
