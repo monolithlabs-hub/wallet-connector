@@ -21,7 +21,12 @@ describe('SessionStore', () => {
   })
 
   it('saves and retrieves pending state', () => {
-    const state = createPendingState({ walletId: 'phantom', requireSignIn: true })
+    const state = createPendingState({
+      walletId: 'phantom',
+      requireSignIn: true,
+      ephemeralPublicKey: 'fakePub',
+      ephemeralSecretKey: 'fakeSec',
+    })
     savePendingState(state)
 
     expect(getPendingState()).toEqual(state)
@@ -37,6 +42,8 @@ describe('SessionStore', () => {
       requireSignIn: false,
       nonce: '00000000-0000-4000-8000-000000000000',
       timestamp: Date.now() - 10 * 60 * 1000 - 1,
+      ephemeralPublicKey: 'fakePub',
+      ephemeralSecretKey: 'fakeSec',
     }
     savePendingState(stale)
 
@@ -49,6 +56,8 @@ describe('SessionStore', () => {
       requireSignIn: false,
       nonce: '00000000-0000-4000-8000-000000000000',
       timestamp: Date.now() - 20 * 60 * 1000,
+      ephemeralPublicKey: 'fakePub',
+      ephemeralSecretKey: 'fakeSec',
     }
     savePendingState(stale)
 
@@ -58,7 +67,14 @@ describe('SessionStore', () => {
   })
 
   it('clearPendingState removes state', () => {
-    savePendingState(createPendingState({ walletId: 'phantom', requireSignIn: false }))
+    savePendingState(
+      createPendingState({
+        walletId: 'phantom',
+        requireSignIn: false,
+        ephemeralPublicKey: 'fakePub',
+        ephemeralSecretKey: 'fakeSec',
+      }),
+    )
     clearPendingState()
 
     expect(getPendingState()).toBeNull()
@@ -76,7 +92,12 @@ describe('SessionStore', () => {
 
   it('does not throw when sessionStorage is unavailable', () => {
     vi.stubGlobal('sessionStorage', undefined)
-    const state = createPendingState({ walletId: 'phantom', requireSignIn: false })
+    const state = createPendingState({
+      walletId: 'phantom',
+      requireSignIn: false,
+      ephemeralPublicKey: 'fakePub',
+      ephemeralSecretKey: 'fakeSec',
+    })
 
     expect(() => savePendingState(state)).not.toThrow()
     expect(() => getPendingState()).not.toThrow()
@@ -92,7 +113,12 @@ describe('SessionStore', () => {
 
   it('falls back to in-memory store when sessionStorage is unavailable', () => {
     vi.stubGlobal('sessionStorage', undefined)
-    const state = createPendingState({ walletId: 'phantom', requireSignIn: true })
+    const state = createPendingState({
+      walletId: 'phantom',
+      requireSignIn: true,
+      ephemeralPublicKey: 'fakePub',
+      ephemeralSecretKey: 'fakeSec',
+    })
 
     savePendingState(state)
 
@@ -107,14 +133,29 @@ describe('SessionStore', () => {
   })
 
   it('createPendingState generates a UUID v4 nonce', () => {
-    const state = createPendingState({ walletId: 'phantom', requireSignIn: false })
+    const state = createPendingState({
+      walletId: 'phantom',
+      requireSignIn: false,
+      ephemeralPublicKey: 'fakePub',
+      ephemeralSecretKey: 'fakeSec',
+    })
 
     expect(state.nonce).toMatch(UUID_V4)
   })
 
   it('createPendingState produces a unique nonce per call', () => {
-    const a = createPendingState({ walletId: 'phantom', requireSignIn: false })
-    const b = createPendingState({ walletId: 'phantom', requireSignIn: false })
+    const a = createPendingState({
+      walletId: 'phantom',
+      requireSignIn: false,
+      ephemeralPublicKey: 'fakePub',
+      ephemeralSecretKey: 'fakeSec',
+    })
+    const b = createPendingState({
+      walletId: 'phantom',
+      requireSignIn: false,
+      ephemeralPublicKey: 'fakePub',
+      ephemeralSecretKey: 'fakeSec',
+    })
 
     expect(a.nonce).not.toBe(b.nonce)
   })
@@ -124,9 +165,23 @@ describe('SessionStore', () => {
       walletId: 'phantom',
       requireSignIn: true,
       signInMessage: 'Sign in to Opindex',
+      ephemeralPublicKey: 'fakePub',
+      ephemeralSecretKey: 'fakeSec',
     })
 
     expect(state.signInMessage).toBe('Sign in to Opindex')
+  })
+
+  it('createPendingState carries the ephemeral keypair fields', () => {
+    const state = createPendingState({
+      walletId: 'phantom',
+      requireSignIn: false,
+      ephemeralPublicKey: 'pubB58',
+      ephemeralSecretKey: 'secB58',
+    })
+
+    expect(state.ephemeralPublicKey).toBe('pubB58')
+    expect(state.ephemeralSecretKey).toBe('secB58')
   })
 
   it('returns null on corrupt JSON in sessionStorage', () => {
