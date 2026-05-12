@@ -20,6 +20,13 @@ export {
 } from './errors'
 
 export {
+  extractCallbackFromCurrentUrl,
+  isCallbackUrl,
+  parseCallback,
+} from './adapters/callback-handler'
+export type { CallbackResult } from './adapters/callback-handler'
+
+export {
   buildConnectUrl,
   buildSignAndConnectUrl,
   generateEphemeralKeypair,
