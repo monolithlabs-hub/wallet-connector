@@ -38,6 +38,16 @@ export type {
   SolanaCluster,
 } from './adapters/deep-link-builder'
 
+export { createDeepLinkAdapter } from './adapters/deep-link-adapter'
+export type {
+  DeepLinkAdapter,
+  DeepLinkAdapterEvent,
+  DeepLinkAdapterListener,
+  DeepLinkAdapterOptions,
+  DeepLinkAdapterUnsubscribe,
+  DeepLinkConnectInput,
+} from './adapters/deep-link-adapter'
+
 export { createStandardWalletAdapter } from './adapters/standard-wallet-adapter'
 export type {
   StandardAdapterEvent,
