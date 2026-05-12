@@ -1,5 +1,5 @@
 {
-  "name": "@opindex/wallet-connect-vue",
+  "name": "@monolithlabs/wallet-connect-vue",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -29,8 +29,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@opindex/wallet-connect-core": "workspace:*",
-    "@opindex/wallet-connect-ui": "workspace:*"
+    "@monolithlabs/wallet-connect-core": "workspace:*",
+    "@monolithlabs/wallet-connect-ui": "workspace:*"
   },
   "peerDependencies": {
     "vue": "^3.5.0"

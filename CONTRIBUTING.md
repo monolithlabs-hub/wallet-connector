@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for working on `@opindex/wallet-connect`. This document covers the only piece of process that's enforced in this repo: **changesets**.
+Thanks for working on `@monolithlabs/wallet-connect`. This document covers the only piece of process that's enforced in this repo: **changesets**.
 
 ## TL;DR
 
@@ -41,11 +41,11 @@ When in doubt, add a versioned one — an extra patch bump is cheap.
 
 ## Linked packages
 
-`@opindex/wallet-connect-ui`, `@opindex/wallet-connect-react`, and `@opindex/wallet-connect-vue` are configured as a **linked group** in `.changeset/config.json`. Practically:
+`@monolithlabs/wallet-connect-ui`, `@monolithlabs/wallet-connect-react`, and `@monolithlabs/wallet-connect-vue` are configured as a **linked group** in `.changeset/config.json`. Practically:
 
 - Each PR can choose a different bump type per package (e.g., minor for `react`, patch for `vue`, none for `ui`).
 - When the release PR is cut, all three packages jump to the same final version (the highest of the three bumps).
-- `@opindex/wallet-connect-core` versions **independently** of the framework packages.
+- `@monolithlabs/wallet-connect-core` versions **independently** of the framework packages.
 
 ## Release flow
 

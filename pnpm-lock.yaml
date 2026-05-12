@@ -92,10 +92,10 @@ importers:
 
   packages/react:
     dependencies:
-      '@opindex/wallet-connect-core':
+      '@monolithlabs/wallet-connect-core':
         specifier: workspace:*
         version: link:../core
-      '@opindex/wallet-connect-ui':
+      '@monolithlabs/wallet-connect-ui':
         specifier: workspace:*
         version: link:../ui
       react:
@@ -104,16 +104,16 @@ importers:
 
   packages/ui:
     dependencies:
-      '@opindex/wallet-connect-core':
+      '@monolithlabs/wallet-connect-core':
         specifier: workspace:*
         version: link:../core
 
   packages/vue:
     dependencies:
-      '@opindex/wallet-connect-core':
+      '@monolithlabs/wallet-connect-core':
         specifier: workspace:*
         version: link:../core
-      '@opindex/wallet-connect-ui':
+      '@monolithlabs/wallet-connect-ui':
         specifier: workspace:*
         version: link:../ui
       vue:

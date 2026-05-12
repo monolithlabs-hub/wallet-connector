@@ -4,7 +4,11 @@
   "commit": false,
   "fixed": [],
   "linked": [
-    ["@opindex/wallet-connect-ui", "@opindex/wallet-connect-react", "@opindex/wallet-connect-vue"]
+    [
+      "@monolithlabs/wallet-connect-ui",
+      "@monolithlabs/wallet-connect-react",
+      "@monolithlabs/wallet-connect-vue"
+    ]
   ],
   "access": "public",
   "baseBranch": "main",

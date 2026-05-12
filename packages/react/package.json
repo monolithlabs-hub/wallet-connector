@@ -1,5 +1,5 @@
 {
-  "name": "@opindex/wallet-connect-react",
+  "name": "@monolithlabs/wallet-connect-react",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -29,8 +29,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@opindex/wallet-connect-core": "workspace:*",
-    "@opindex/wallet-connect-ui": "workspace:*"
+    "@monolithlabs/wallet-connect-core": "workspace:*",
+    "@monolithlabs/wallet-connect-ui": "workspace:*"
   },
   "peerDependencies": {
     "react": ">=18"

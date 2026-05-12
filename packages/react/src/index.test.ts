@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 
-describe('@opindex/wallet-connect-react test setup', () => {
+describe('@monolithlabs/wallet-connect-react test setup', () => {
   it('runs a trivial assertion', () => {
     expect(true).toBe(true)
   })
