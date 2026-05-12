@@ -19,6 +19,18 @@ export {
   WalletWindowClosedError,
 } from './errors'
 
+export {
+  buildConnectUrl,
+  buildSignAndConnectUrl,
+  generateEphemeralKeypair,
+} from './adapters/deep-link-builder'
+export type {
+  ConnectOptions,
+  EphemeralKeypair,
+  SignConnectOptions,
+  SolanaCluster,
+} from './adapters/deep-link-builder'
+
 export { detectPlatform } from './platform/detector'
 export type { PlatformInfo, PlatformStrategy } from './platform/detector'
 
