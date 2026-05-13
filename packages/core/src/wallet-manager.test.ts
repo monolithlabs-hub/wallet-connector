@@ -5,7 +5,7 @@ import type { CallbackResult } from './adapters/callback-handler'
 import type { DeepLinkAdapter } from './adapters/deep-link-adapter'
 import type { StandardWalletAdapter } from './adapters/standard-wallet-adapter'
 import type { DiscoveryHandle } from './discovery'
-import { WalletConnectionError, WalletNotReadyError } from './errors'
+import { WalletConnectionError, WalletNotConnectedError, WalletNotReadyError } from './errors'
 import type { PlatformInfo } from './platform/detector'
 import type { PendingState } from './session/store'
 import { asWalletName } from './wallet-name'
@@ -929,5 +929,82 @@ describe('createWalletManager — destroy', () => {
     manager.destroy()
 
     expect(dlAdapter.destroy).toHaveBeenCalledOnce()
+  })
+})
+
+describe('createWalletManager — signMessage / signIn (desktop)', () => {
+  beforeEach(() => {
+    mocks.detectPlatform.mockReturnValue(DESKTOP_PLATFORM)
+  })
+
+  it('signMessage delegates to the connected StandardWalletAdapter', async () => {
+    const sig = new Uint8Array(64).fill(0x42)
+    const adapter = makeStandardAdapter({ name: 'Phantom', connectPublicKey: 'PK', signature: sig })
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([adapter]))
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+
+    await manager.connect('phantom')
+    const message = new TextEncoder().encode('hello')
+    const out = await manager.signMessage(new Uint8Array(message))
+
+    expect(adapter.signMessage).toHaveBeenCalledWith(expect.any(Uint8Array))
+    expect(out).toEqual(sig)
+  })
+
+  it('signIn delegates to the connected StandardWalletAdapter', async () => {
+    const adapter = makeStandardAdapter({ name: 'Phantom', connectPublicKey: 'PK' })
+    const signInResult = {
+      account: { address: 'PK' },
+      signedMessage: new Uint8Array([1]),
+      signature: new Uint8Array([2]),
+    }
+    ;(adapter.signIn as ReturnType<typeof vi.fn>).mockResolvedValue(signInResult)
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([adapter]))
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+
+    await manager.connect('phantom')
+    const out = await manager.signIn({ domain: 'example.com' })
+
+    expect(adapter.signIn).toHaveBeenCalledWith({ domain: 'example.com' })
+    expect(out).toBe(signInResult)
+  })
+
+  it('signMessage throws WalletNotConnectedError when no wallet is connected', async () => {
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([]))
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+
+    await expect(manager.signMessage(new Uint8Array([0]))).rejects.toThrow(WalletNotConnectedError)
+  })
+
+  it('signIn throws WalletNotConnectedError when no wallet is connected', async () => {
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([]))
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+
+    await expect(manager.signIn()).rejects.toThrow(WalletNotConnectedError)
+  })
+
+  it('signMessage throws after destroy()', async () => {
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([]))
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+    manager.destroy()
+
+    await expect(manager.signMessage(new Uint8Array([0]))).rejects.toThrow(/has been destroyed/)
+  })
+})
+
+describe('createWalletManager — signMessage / signIn (mobile)', () => {
+  beforeEach(() => {
+    mocks.detectPlatform.mockReturnValue(MOBILE_PLATFORM)
+    mocks.createDeepLinkAdapter.mockReturnValue(makeDeepLinkAdapter())
+  })
+
+  it('signMessage throws WalletNotReadyError — bundled SIWS only on the deep-link path', async () => {
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+    await expect(manager.signMessage(new Uint8Array([0]))).rejects.toThrow(WalletNotReadyError)
+  })
+
+  it('signIn throws WalletNotReadyError — bundled SIWS only on the deep-link path', async () => {
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+    await expect(manager.signIn()).rejects.toThrow(WalletNotReadyError)
   })
 })

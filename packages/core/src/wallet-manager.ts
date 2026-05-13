@@ -1,10 +1,16 @@
+import type { SolanaSignInInput, SolanaSignInOutput } from '@solana/wallet-standard-features'
 import bs58 from 'bs58'
 
 import { createDeepLinkAdapter, type DeepLinkAdapter } from './adapters/deep-link-adapter'
 import type { SolanaCluster } from './adapters/deep-link-builder'
 import type { StandardWalletAdapter } from './adapters/standard-wallet-adapter'
 import { discoverStandardWallets, type DiscoveryHandle } from './discovery'
-import { WalletConnectionError, WalletError, WalletNotReadyError } from './errors'
+import {
+  WalletConnectionError,
+  WalletError,
+  WalletNotConnectedError,
+  WalletNotReadyError,
+} from './errors'
 import { detectPlatform, type PlatformInfo } from './platform/detector'
 import { getPendingState, saveLastUsedWallet } from './session/store'
 import {
@@ -103,6 +109,23 @@ export interface WalletManager {
   connect(walletId: string): Promise<void>
   /** Clear local session state. Emits `'disconnect'` to subscribers if previously connected. Throws after {@link destroy}. */
   disconnect(): Promise<void>
+  /**
+   * Sign an arbitrary message with the currently-connected wallet. Only
+   * supported on the extension / in-app-browser path (desktop and the
+   * Phantom-style in-app browsers). On mobile (deep-link) this throws
+   * `WalletNotReadyError` — the mobile path uses bundled SIWS via
+   * `requireSignIn: true` on `connect()`, not standalone post-connect signs.
+   *
+   * Throws `WalletNotConnectedError` if no wallet is connected, and after
+   * {@link destroy}.
+   */
+  signMessage(message: Uint8Array): Promise<Uint8Array>
+  /**
+   * Sign-In With Solana with the currently-connected wallet. Same
+   * platform constraints as {@link signMessage}. Throws `WalletNotReadyError`
+   * if the wallet doesn't implement the `solana:signIn` feature.
+   */
+  signIn(input?: SolanaSignInInput): Promise<SolanaSignInOutput>
   getState(): FlowState
   getContext(): FlowContext
   subscribe(listener: StateListener): Unsubscribe
@@ -353,6 +376,41 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
     }
   }
 
+  function requireConnectedStandardAdapter(): StandardWalletAdapter {
+    if (platform.strategy !== 'extension') {
+      throw new WalletNotReadyError(
+        'Standalone signMessage / signIn is not available on the mobile deep-link path; use `requireSignIn: true` on connect() instead',
+      )
+    }
+    const ctx = machine.getContext()
+    if (!ctx.walletId) {
+      throw new WalletNotConnectedError('No wallet is connected')
+    }
+    const walletConfig = findWalletConfig(ctx.walletId)
+    if (!walletConfig) {
+      throw new WalletNotConnectedError(`Connected wallet '${ctx.walletId}' is not in the config`)
+    }
+    const adapter = findStandardAdapter(walletConfig)
+    if (!adapter) {
+      throw new WalletNotReadyError(
+        `Wallet '${walletConfig.name}' is no longer registered with the Wallet Standard registry`,
+      )
+    }
+    return adapter
+  }
+
+  async function signMessage(message: Uint8Array): Promise<Uint8Array> {
+    assertAlive()
+    const adapter = requireConnectedStandardAdapter()
+    return adapter.signMessage(message)
+  }
+
+  async function signIn(input?: SolanaSignInInput): Promise<SolanaSignInOutput> {
+    assertAlive()
+    const adapter = requireConnectedStandardAdapter()
+    return adapter.signIn(input)
+  }
+
   async function disconnect(): Promise<void> {
     assertAlive()
     if (platform.strategy === 'extension') {
@@ -387,6 +445,8 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
       getSortedWallets(config.wallets, platform, { pinnedWalletId: pinnedWallet }),
     connect,
     disconnect,
+    signMessage,
+    signIn,
     getState: () => machine.getState(),
     getContext: () => machine.getContext(),
     subscribe: (listener) => {

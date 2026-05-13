@@ -96,3 +96,12 @@ export type { WalletManager, WalletManagerConfig } from './wallet-manager'
 // --- Ported types (pure type aliases — see file header note) -------------
 
 export type { WalletName } from './wallet-name'
+
+// --- Re-exports from upstream spec packages ------------------------------
+// `WalletManager.signIn` accepts/returns these; downstream packages that
+// type-annotate against the manager (e.g. the react hook's `signIn` return)
+// need to import them. Re-exporting here keeps consumers on one import path
+// and avoids requiring them to add `@solana/wallet-standard-features` as a
+// direct dependency.
+
+export type { SolanaSignInInput, SolanaSignInOutput } from '@solana/wallet-standard-features'

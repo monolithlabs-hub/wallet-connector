@@ -30,6 +30,8 @@ import type {
   SerializedFlow,
   SignConnectOptions,
   SolanaCluster,
+  SolanaSignInInput,
+  SolanaSignInOutput,
   SortOptions,
   StandardAdapterEvent,
   StandardAdapterListener,
@@ -70,6 +72,8 @@ type _Slots = {
   serializedFlow: SerializedFlow
   signConnectOptions: SignConnectOptions
   solanaCluster: SolanaCluster
+  solanaSignInInput: SolanaSignInInput
+  solanaSignInOutput: SolanaSignInOutput
   sortOptions: SortOptions
   standardAdapterEvent: StandardAdapterEvent
   standardAdapterListener: StandardAdapterListener
@@ -130,6 +134,8 @@ describe('public types barrel', () => {
       serializedFlow: 'serializedFlow',
       signConnectOptions: 'signConnectOptions',
       solanaCluster: 'solanaCluster',
+      solanaSignInInput: 'solanaSignInInput',
+      solanaSignInOutput: 'solanaSignInOutput',
       sortOptions: 'sortOptions',
       standardAdapterEvent: 'standardAdapterEvent',
       standardAdapterListener: 'standardAdapterListener',
@@ -143,7 +149,7 @@ describe('public types barrel', () => {
       walletManagerConfig: 'walletManagerConfig',
       walletName: 'walletName',
     }
-    expect(Object.keys(slots)).toHaveLength(34)
+    expect(Object.keys(slots)).toHaveLength(36)
   })
 
   it('PLAN.md TASK-110 lists 10 core types — verify each by name', () => {
