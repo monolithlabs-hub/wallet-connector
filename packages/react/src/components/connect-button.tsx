@@ -5,6 +5,12 @@ import {
   type WalletConfig,
 } from '@monolithlabs/wallet-connect-core'
 import {
+  attachModal,
+  getDialogAttributes,
+  getInstallBadge,
+  truncatePublicKey,
+} from '@monolithlabs/wallet-connect-ui'
+import {
   useCallback,
   useEffect,
   useId,
@@ -46,47 +52,36 @@ const DEFAULT_LABEL = 'Connect Wallet'
 const DEFAULT_CONNECTED_LABEL = 'Connected'
 const PINNED_WALLET_ID = 'opindex'
 
-/**
- * Truncate a base58 public key for display. `ABC...XYZ` style with 4 chars
- * on each side by default. Inputs shorter than the head + tail are returned
- * verbatim.
- */
-function truncatePublicKey(pubkey: string, head = 4, tail = 4): string {
-  if (pubkey.length <= head + tail) return pubkey
-  return `${pubkey.slice(0, head)}…${pubkey.slice(-tail)}`
-}
-
-function badgeFor(wallet: WalletConfig, platform: PlatformInfo): 'Get' | 'Install' | null {
-  if (wallet.id !== PINNED_WALLET_ID) return null
-  if (platform.isMobile) return 'Get'
-  if (!platform.hasOpindexExtension) return 'Install'
-  return null
-}
-
 function isFlowStateConnected(state: FlowState): boolean {
   return state === 'connected' || state === 'signing' || state === 'authenticated'
+}
+
+/**
+ * Compute whether the pinned-wallet badge should render for `wallet`.
+ *
+ * Mobile: always show (iOS can't probe for installed apps).
+ * Desktop with the extension detected: hide.
+ * Desktop without the extension: show with the "Install" badge.
+ */
+function shouldShowInstallBadge(wallet: WalletConfig, platform: PlatformInfo): boolean {
+  if (wallet.id !== PINNED_WALLET_ID) return false
+  if (platform.isMobile) return true
+  return !platform.hasOpindexExtension
 }
 
 /**
  * Ready-to-use button that runs the full wallet connect flow.
  *
  * - Disconnected: shows `label` ("Connect Wallet" by default). Clicking
- *   opens a modal listing the manager's sorted wallets. The pinned wallet
- *   carries a "Get" badge on mobile (iOS cannot probe for installed apps,
- *   so we always invite the user to install) and an "Install" badge on
- *   desktop without the Opindex extension detected.
+ *   opens a modal listing the manager's sorted wallets. The pinned
+ *   wallet carries a "Get" badge on iOS (App Store convention) and an
+ *   "Install" badge on Android / desktop without the Opindex extension.
  * - Connected: the button shows a truncated public key. Clicking opens
  *   the modal in "connected" mode with a Disconnect action.
  *
- * The modal is accessible: `role="dialog"`, `aria-modal="true"`, an
- * `aria-labelledby` link to the modal heading, a Tab/Shift+Tab focus trap,
- * Escape-to-close, and initial focus moved to the first focusable element
- * on open.
- *
- * The component is self-contained — it does NOT yet depend on
- * `@monolithlabs/wallet-connect-ui`. When TASK-401 / TASK-402 land, the
- * modal shell and wallet-list-item primitives will be extracted there and
- * this component will re-implement on top of them.
+ * Modal accessibility, focus management, and body scroll lock are
+ * handled by `@monolithlabs/wallet-connect-ui`'s {@link attachModal} —
+ * see `WalletModal` below for the integration.
  */
 export function ConnectButton({
   label = DEFAULT_LABEL,
@@ -103,18 +98,10 @@ export function ConnectButton({
 
   const titleId = useId()
 
-  // Fire `onConnected` / `onAuthenticated` on flow-state transitions. The
-  // WalletManager already exposes the same callbacks on its config, but the
-  // ConnectButton props let consumers attach instance-scoped handlers
-  // without having to thread the manager-level config in for every button.
-  //
-  // The modal **auto-closes on the `authenticated` transition** rather than
-  // on `connected`. For `requireSignIn: false` flows the FlowMachine
-  // auto-steps `connected → authenticated` in the same dispatch, so the
-  // close timing is unchanged. For `requireSignIn: true` flows the modal
-  // stays open through the `signing` state — the user keeps seeing the
-  // dialog while their wallet shows a sign prompt, instead of the dApp
-  // silently dropping back to "connected" UI mid-flow.
+  // Fire `onConnected` / `onAuthenticated` on flow-state transitions.
+  // Auto-closes on the `authenticated` transition rather than `connected`
+  // so requireSignIn flows keep the dialog visible through the signing
+  // step (see TASK-203 review).
   const prevStateRef = useRef<FlowState>(wallet.state)
   useEffect(() => {
     const prev = prevStateRef.current
@@ -136,9 +123,8 @@ export function ConnectButton({
     }
   }, [wallet.state, wallet.publicKey, wallet.signature, onConnected, onAuthenticated])
 
-  // Pass the walletId straight into `wallet.connect` — the optional-arg
-  // overload bypasses the React state cycle (no need for `select()` first)
-  // and is immune to same-handler stale closures.
+  // Pass the walletId straight into `wallet.connect` — bypasses the React
+  // state cycle (no need for `select()` first).
   const walletConnect = wallet.connect
   const handleSelectWallet = useCallback(
     async (walletId: string) => {
@@ -151,17 +137,12 @@ export function ConnectButton({
     [walletConnect],
   )
 
-  // `wallet.disconnect` is a stable reference across renders (useWallet
-  // wraps it in `useCallback([manager])`), so the dep array hits its
-  // memo cache. The earlier `[wallet]` dep was a fresh object every
-  // render and made the memo useless.
   const walletDisconnect = wallet.disconnect
   const handleDisconnect = useCallback(async () => {
     try {
       await walletDisconnect()
     } catch {
-      // Best-effort. The FlowMachine RESET runs unconditionally; the
-      // adapter throw is swallowed by `manager.disconnect()`.
+      // Best-effort. The FlowMachine RESET runs unconditionally.
     }
     setOpen(false)
   }, [walletDisconnect])
@@ -221,8 +202,9 @@ export function ConnectButton({
 }
 
 // ---------------------------------------------------------------------------
-// Internal components — to be extracted into @monolithlabs/wallet-connect-ui
-// when TASK-401 / TASK-402 land.
+// Internal rendering helpers. Lifecycle / a11y wiring delegated to
+// `@monolithlabs/wallet-connect-ui` (TASK-401); this file only owns the JSX
+// shape and the inline default styling.
 // ---------------------------------------------------------------------------
 
 interface WalletModalProps {
@@ -234,71 +216,26 @@ interface WalletModalProps {
 
 function WalletModal({ titleId, title, onClose, children }: WalletModalProps): ReactNode {
   const dialogRef = useRef<HTMLDivElement>(null)
-
-  // Initial focus + focus trap + focus restoration on close.
+  // Stabilize the close callback via a ref so attaching `attachModal`
+  // doesn't re-fire when the parent re-renders with a fresh inline
+  // closure. The ref is updated in a useEffect (not during render) to
+  // satisfy `react-hooks/refs`. Timing: between render and effect the
+  // ref points at the previous closure — fine for our case since both
+  // resolve to `() => setOpen(false)` and setOpen is stable.
+  const onCloseRef = useRef(onClose)
   useEffect(() => {
-    const root = dialogRef.current
-    if (!root) return
-
-    // Remember the element that had focus before the dialog opened so we
-    // can return focus to it on close (WCAG modal-pattern guidance).
-    // Typically this is the <ConnectButton> trigger. If the trigger is no
-    // longer in the DOM at close time, `.focus()` is a no-op.
-    const previouslyFocused = document.activeElement as HTMLElement | null
-
-    const getFocusable = (): HTMLElement[] => {
-      const selector =
-        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      return Array.from(root.querySelectorAll<HTMLElement>(selector))
-    }
-
-    // Move focus into the dialog on open. Pick the first focusable element
-    // — typically the close button or the first wallet in the list.
-    const focusables = getFocusable()
-    focusables[0]?.focus()
-
-    // Use an arrow function so the `root` narrowing from `if (!root) return`
-    // flows into the closure. A `function` declaration would re-widen.
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        onClose()
-        return
-      }
-      if (event.key !== 'Tab') return
-      const items = getFocusable()
-      if (items.length === 0) {
-        event.preventDefault()
-        return
-      }
-      const first = items[0]
-      const last = items[items.length - 1]
-      if (!first || !last) return
-      const active = document.activeElement as HTMLElement | null
-
-      if (event.shiftKey) {
-        if (active === first || !root.contains(active)) {
-          event.preventDefault()
-          last.focus()
-        }
-      } else {
-        if (active === last || !root.contains(active)) {
-          event.preventDefault()
-          first.focus()
-        }
-      }
-    }
-
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      // Restore focus to the element that opened the dialog. Guard with
-      // `?.focus?.()` because `previouslyFocused` may be `null` (no
-      // active element) or, in some test environments, a non-element
-      // node that lacks `focus()`.
-      previouslyFocused?.focus?.()
-    }
+    onCloseRef.current = onClose
   }, [onClose])
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+    const handle = attachModal({
+      root: dialog,
+      onRequestClose: () => onCloseRef.current(),
+    })
+    return () => handle.destroy()
+  }, [])
 
   return (
     <div
@@ -306,21 +243,20 @@ function WalletModal({ titleId, title, onClose, children }: WalletModalProps): R
       style={modalBackdropStyle}
       onClick={(e) => {
         // Click on the backdrop (NOT a descendant) closes the modal.
-        if (e.target === e.currentTarget) onClose()
+        if (e.target === e.currentTarget) onCloseRef.current()
       }}
     >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        style={modalContentStyle}
-      >
+      <div ref={dialogRef} {...getDialogAttributes(titleId)} style={modalContentStyle}>
         <header style={modalHeaderStyle}>
           <h2 id={titleId} style={modalTitleStyle}>
             {title}
           </h2>
-          <button type="button" onClick={onClose} aria-label="Close" style={modalCloseButtonStyle}>
+          <button
+            type="button"
+            onClick={() => onCloseRef.current()}
+            aria-label="Close"
+            style={modalCloseButtonStyle}
+          >
             {'×'}
           </button>
         </header>
@@ -353,7 +289,10 @@ function WalletList({
   return (
     <ul role="list" style={walletListStyle}>
       {wallets.map((wallet) => {
-        const badge = badgeFor(wallet, platform)
+        const badge = getInstallBadge({
+          shouldShow: shouldShowInstallBadge(wallet, platform),
+          isIOS: platform.isIOS,
+        })
         const isConnecting = state === 'connecting' && connectingWalletId === wallet.id
         return (
           <li key={wallet.id} style={{ margin: 0 }}>
@@ -417,8 +356,7 @@ function ConnectedView({
 // ---------------------------------------------------------------------------
 // Minimal inline default styling. Consumers can override via className /
 // style on the root button and via CSS targeting the standard ARIA selectors
-// (`[role="dialog"]`, etc.) for the modal. A future TASK-401 will lift these
-// into the headless UI package.
+// (`[role="dialog"]`, etc.) for the modal.
 // ---------------------------------------------------------------------------
 
 const modalBackdropStyle: CSSProperties = {

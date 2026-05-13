@@ -6,6 +6,14 @@ import {
   type WalletConfig,
 } from '@monolithlabs/wallet-connect-core'
 import {
+  attachModal,
+  getDialogAttributes,
+  getInstallBadge,
+  truncatePublicKey,
+  type InstallBadge,
+  type ModalHandle,
+} from '@monolithlabs/wallet-connect-ui'
+import {
   computed,
   nextTick,
   onUnmounted,
@@ -32,8 +40,13 @@ import { useWallet } from '../composables/use-wallet'
  *
  * **Modal placement**: rendered into `document.body` via `<Teleport>` so
  * the modal isn't clipped by transformed ancestor containers (a common
- * footgun with `position: fixed` inside CSS-transformed parents). The
- * Vue parity for React's "TASK-401 will give us a portal" caveat.
+ * footgun with `position: fixed` inside CSS-transformed parents).
+ *
+ * **Modal lifecycle** (focus trap, initial focus, focus restoration on
+ * close, body scroll lock, Escape handler): delegated to
+ * `@monolithlabs/wallet-connect-ui`'s `attachModal`. This component owns
+ * the JSX shape, the open/close state, and the inline default styling
+ * only.
  */
 
 const props = withDefaults(
@@ -90,20 +103,19 @@ const dialogRef = useTemplateRef<HTMLDivElement>('dialog')
 
 const PINNED_WALLET_ID = 'opindex'
 
-function truncatePublicKey(pubkey: string, head = 4, tail = 4): string {
-  if (pubkey.length <= head + tail) return pubkey
-  return `${pubkey.slice(0, head)}…${pubkey.slice(-tail)}`
-}
-
 function isFlowStateConnected(state: FlowState): boolean {
   return state === 'connected' || state === 'signing' || state === 'authenticated'
 }
 
-function badgeFor(walletConfig: WalletConfig): 'Get' | 'Install' | null {
-  if (walletConfig.id !== PINNED_WALLET_ID) return null
-  if (platform.value.isMobile) return 'Get'
-  if (!platform.value.hasOpindexExtension) return 'Install'
-  return null
+/**
+ * Compute the install-prompt badge label for a wallet row, or `null` to
+ * omit. Thin wrapper around `getInstallBadge` from `wallet-connect-ui`.
+ */
+function badgeFor(walletConfig: WalletConfig): InstallBadge | null {
+  const shouldShow =
+    walletConfig.id === PINNED_WALLET_ID &&
+    (platform.value.isMobile || !platform.value.hasOpindexExtension)
+  return getInstallBadge({ shouldShow, isIOS: platform.value.isIOS })
 }
 
 const truncated = computed<string | null>(() =>
@@ -172,76 +184,35 @@ function handleBackdropClick(event: MouseEvent): void {
   }
 }
 
-// ---- Focus trap + restoration ------------------------------------------
+// ---- Modal lifecycle (delegated to attachModal) ------------------------
 
-let previouslyFocused: HTMLElement | null = null
+let modalHandle: ModalHandle | null = null
 
-function getFocusable(): HTMLElement[] {
-  const root = dialogRef.value
-  if (!root) return []
-  const selector =
-    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-  return Array.from(root.querySelectorAll<HTMLElement>(selector))
-}
-
-function handleKeydown(event: KeyboardEvent): void {
-  if (!open.value) return
-  const root = dialogRef.value
-  if (!root) return
-
-  if (event.key === 'Escape') {
-    event.preventDefault()
-    open.value = false
-    return
-  }
-  if (event.key !== 'Tab') return
-
-  const items = getFocusable()
-  if (items.length === 0) {
-    event.preventDefault()
-    return
-  }
-  const first = items[0]
-  const last = items[items.length - 1]
-  if (!first || !last) return
-  const active = document.activeElement as HTMLElement | null
-
-  if (event.shiftKey) {
-    if (active === first || !root.contains(active)) {
-      event.preventDefault()
-      last.focus()
-    }
-  } else {
-    if (active === last || !root.contains(active)) {
-      event.preventDefault()
-      first.focus()
-    }
-  }
-}
-
-// Manage focus + the keydown listener as `open` toggles. Mirrors React's
-// `useEffect` on `open` but split into the two transitions Vue's `watch`
-// gives us by default.
 watch(open, async (isOpen) => {
   if (isOpen) {
-    previouslyFocused = (typeof document !== 'undefined'
-      ? (document.activeElement as HTMLElement | null)
-      : null)
-    document.addEventListener('keydown', handleKeydown)
     // Wait for `<Teleport>` to commit so the dialog ref is populated
-    // before reading focusables out of it.
+    // before attachModal queries it for focusables.
     await nextTick()
-    getFocusable()[0]?.focus()
+    if (dialogRef.value) {
+      modalHandle = attachModal({
+        root: dialogRef.value,
+        onRequestClose: () => {
+          open.value = false
+        },
+      })
+    }
   } else {
-    document.removeEventListener('keydown', handleKeydown)
-    previouslyFocused?.focus?.()
-    previouslyFocused = null
+    modalHandle?.destroy()
+    modalHandle = null
   }
 })
 
 onUnmounted(() => {
-  document.removeEventListener('keydown', handleKeydown)
+  modalHandle?.destroy()
+  modalHandle = null
 })
+
+const dialogAttrs = computed(() => getDialogAttributes(titleId))
 
 // ---- Inline default styling -------------------------------------------
 // Minimal — consumer overrides via class / style on the root button or
@@ -377,13 +348,7 @@ const connectedViewStyle: CSSProperties = {
       :style="modalBackdropStyle"
       @click="handleBackdropClick"
     >
-      <div
-        ref="dialog"
-        role="dialog"
-        aria-modal="true"
-        :aria-labelledby="titleId"
-        :style="modalContentStyle"
-      >
+      <div ref="dialog" v-bind="dialogAttrs" :style="modalContentStyle">
         <header :style="modalHeaderStyle">
           <h2 :id="titleId" :style="modalTitleStyle">{{ modalTitle }}</h2>
           <button

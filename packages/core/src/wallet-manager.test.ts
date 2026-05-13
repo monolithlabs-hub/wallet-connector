@@ -84,6 +84,8 @@ const OPINDEX: WalletConfig = {
 
 const DESKTOP_PLATFORM: PlatformInfo = {
   isMobile: false,
+  isIOS: false,
+  isAndroid: false,
   hasExtension: true,
   hasOpindexExtension: false,
   strategy: 'extension',
@@ -91,6 +93,8 @@ const DESKTOP_PLATFORM: PlatformInfo = {
 
 const MOBILE_PLATFORM: PlatformInfo = {
   isMobile: true,
+  isIOS: true,
+  isAndroid: false,
   hasExtension: false,
   hasOpindexExtension: false,
   strategy: 'deeplink',
@@ -98,6 +102,8 @@ const MOBILE_PLATFORM: PlatformInfo = {
 
 const NO_WALLET_PLATFORM: PlatformInfo = {
   isMobile: false,
+  isIOS: false,
+  isAndroid: false,
   hasExtension: false,
   hasOpindexExtension: false,
   strategy: 'install-prompt',
