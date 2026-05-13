@@ -9,7 +9,7 @@ import {
   type WalletManager,
   type WalletManagerConfig,
 } from '@monolithlabs/wallet-connect-core'
-import { useCallback, useContext, useEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 
 import { WalletConnectContext } from '../context/wallet-connect-context'
 
@@ -34,7 +34,14 @@ export interface UseWalletReturn {
   connected: boolean
   disconnecting: boolean
   select: (walletId: string) => void
-  connect: () => Promise<void>
+  /**
+   * Initiate a connect flow. Pass the `walletId` directly, or call
+   * {@link UseWalletReturn.select} first and `connect()` will use the
+   * selection. The optional argument is the safer path: it bypasses the
+   * React state cycle entirely (no stale-closure risk) and is what
+   * `<ConnectButton>` uses internally.
+   */
+  connect: (walletId?: string) => Promise<void>
   disconnect: () => Promise<void>
   signMessage: (message: Uint8Array) => Promise<Uint8Array>
   signIn: (input?: SolanaSignInInput) => Promise<SolanaSignInOutput>
@@ -47,6 +54,12 @@ export interface UseWalletReturn {
   isSigning: boolean
   isAuthenticated: boolean
   error: WalletError | null
+  /**
+   * The SIWS signature returned by the wallet, base58-encoded. Set on the
+   * `signing → authenticated` transition; cleared on `RESET`. `null` until
+   * `requireSignIn: true` flows complete.
+   */
+  signature: string | null
 }
 
 /**
@@ -123,7 +136,13 @@ export function useWallet(config?: WalletManagerConfig): UseWalletReturn {
   // wallet-adapter compat: track the user-selected wallet (pre-connect)
   // separately from the in-flight / connected one. Once a connect resolves
   // the manager's context.walletId takes over as the source of truth.
+  //
+  // Stored in BOTH state (so `wallet` re-renders when selection changes)
+  // AND a ref (so `connect()` can read the latest selection synchronously
+  // — `connect()` in the same handler as `select()` would otherwise close
+  // over the pre-`select` state value and throw "No wallet selected").
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null)
+  const selectedWalletIdRef = useRef<string | null>(null)
 
   // Local flag for the disconnecting transition — the FlowMachine collapses
   // disconnect into a sync RESET so there's no observable "disconnecting"
@@ -144,21 +163,35 @@ export function useWallet(config?: WalletManagerConfig): UseWalletReturn {
     activeWalletId !== null ? (sortedWallets.find((w) => w.id === activeWalletId) ?? null) : null
 
   const select = useCallback((walletId: string) => {
+    // Write the ref FIRST, synchronously — so `connect()` called in the
+    // same event handler sees the latest selection without waiting for
+    // the setState to flush.
+    selectedWalletIdRef.current = walletId
     setSelectedWalletId(walletId)
   }, [])
 
-  const connect = useCallback(async () => {
-    const id = context.walletId ?? selectedWalletId
-    if (!id) {
-      throw new WalletConnectionError('No wallet selected. Call select(walletId) before connect().')
-    }
-    await manager.connect(id)
-  }, [manager, selectedWalletId, context.walletId])
+  const connect = useCallback(
+    async (walletId?: string) => {
+      // Resolution order: explicit arg → ref-tracked selection → the
+      // manager's in-flight walletId (lets reconnects on a known wallet
+      // work without re-calling select). The closure only depends on
+      // `manager`, so this callback is stable across renders.
+      const id = walletId ?? selectedWalletIdRef.current ?? manager.getContext().walletId
+      if (!id) {
+        throw new WalletConnectionError(
+          'No wallet selected. Pass a walletId to connect() or call select(walletId) first.',
+        )
+      }
+      await manager.connect(id)
+    },
+    [manager],
+  )
 
   const disconnect = useCallback(async () => {
     setDisconnecting(true)
     try {
       await manager.disconnect()
+      selectedWalletIdRef.current = null
       setSelectedWalletId(null)
     } finally {
       setDisconnecting(false)
@@ -188,5 +221,6 @@ export function useWallet(config?: WalletManagerConfig): UseWalletReturn {
     isSigning: state === 'signing',
     isAuthenticated: state === 'authenticated',
     error: context.error,
+    signature: context.signature,
   }
 }

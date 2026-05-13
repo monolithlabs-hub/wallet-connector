@@ -14,7 +14,6 @@ import {
   type ReactNode,
 } from 'react'
 
-import { useWalletContext } from '../context/use-wallet-context'
 import { useWallet } from '../hooks/use-wallet'
 
 /**
@@ -98,7 +97,6 @@ export function ConnectButton({
   onAuthenticated,
 }: ConnectButtonProps): ReactNode {
   const wallet = useWallet()
-  const manager = useWalletContext()
   const [open, setOpen] = useState(false)
   // Lazy init so detectPlatform (which reads navigator) runs once per mount.
   const [platform] = useState<PlatformInfo>(() => detectPlatform())
@@ -131,30 +129,26 @@ export function ConnectButton({
     }
 
     if (prev !== 'authenticated' && curr === 'authenticated') {
-      // The signature isn't exposed on `useWallet`'s return — read it from
-      // the manager's flow context at the transition point.
-      const ctx = manager.getContext()
-      if (ctx.publicKey && ctx.signature) {
-        onAuthenticated?.(ctx.publicKey, ctx.signature)
+      if (wallet.publicKey && wallet.signature) {
+        onAuthenticated?.(wallet.publicKey, wallet.signature)
       }
       setOpen(false)
     }
-  }, [wallet.state, wallet.publicKey, manager, onConnected, onAuthenticated])
+  }, [wallet.state, wallet.publicKey, wallet.signature, onConnected, onAuthenticated])
 
-  // Use `manager.connect(id)` directly rather than `wallet.select(id);
-  // wallet.connect();` because the latter has a stale-closure issue in the
-  // same handler — `wallet.connect` closes over the pre-`select` value of
-  // `selectedWalletId`. The manager API takes the id explicitly and is
-  // immune to that.
+  // Pass the walletId straight into `wallet.connect` — the optional-arg
+  // overload bypasses the React state cycle (no need for `select()` first)
+  // and is immune to same-handler stale closures.
+  const walletConnect = wallet.connect
   const handleSelectWallet = useCallback(
     async (walletId: string) => {
       try {
-        await manager.connect(walletId)
+        await walletConnect(walletId)
       } catch {
         // Errors land on `wallet.error`; the modal renders that branch.
       }
     },
-    [manager],
+    [walletConnect],
   )
 
   // `wallet.disconnect` is a stable reference across renders (useWallet

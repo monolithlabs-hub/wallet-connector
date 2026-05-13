@@ -152,6 +152,35 @@ describe('useWallet', () => {
     expect(mock.connectSpy).not.toHaveBeenCalled()
   })
 
+  it('connect(walletId) works without a prior select()', async () => {
+    const mock = makeMockManager()
+    const { result } = renderHook(() => useWallet(), { wrapper: makeWrapper(mock.manager) })
+
+    await act(async () => {
+      await result.current.connect('phantom')
+    })
+
+    expect(mock.connectSpy).toHaveBeenCalledWith('phantom')
+  })
+
+  it('select(id) + connect() in the SAME synchronous handler does not stale-close', async () => {
+    // Regression test for the stale-closure issue: when select() and
+    // connect() are called from the same event handler, `connect()` used
+    // to close over the pre-`select` value of `selectedWalletId` and
+    // throw. The ref-based selection tracker fixes this by exposing the
+    // just-written value synchronously.
+    const mock = makeMockManager()
+    const { result } = renderHook(() => useWallet(), { wrapper: makeWrapper(mock.manager) })
+
+    await act(async () => {
+      result.current.select('phantom')
+      await result.current.connect()
+    })
+
+    expect(mock.connectSpy).toHaveBeenCalledTimes(1)
+    expect(mock.connectSpy).toHaveBeenCalledWith('phantom')
+  })
+
   it('isConnecting is true while in the connecting state', () => {
     const mock = makeMockManager()
     const { result } = renderHook(() => useWallet(), { wrapper: makeWrapper(mock.manager) })
@@ -164,6 +193,48 @@ describe('useWallet', () => {
     expect(result.current.connecting).toBe(true)
     expect(result.current.isConnected).toBe(false)
     expect(result.current.isAuthenticated).toBe(false)
+  })
+
+  it('exposes the SIWS signature on the authenticated transition', () => {
+    const mock = makeMockManager()
+    const { result } = renderHook(() => useWallet(), { wrapper: makeWrapper(mock.manager) })
+
+    expect(result.current.signature).toBeNull()
+
+    act(() => {
+      mock.machine.send({ type: 'CONNECT_INITIATED', walletId: 'phantom' })
+      mock.machine.send({
+        type: 'WALLET_CONNECTED',
+        publicKey: 'PK',
+        requireSignIn: true,
+      })
+      mock.machine.send({ type: 'SIGN_INITIATED' })
+      mock.machine.send({ type: 'SIGN_COMPLETED', signature: 'sig-b58' })
+    })
+
+    expect(result.current.signature).toBe('sig-b58')
+  })
+
+  it('signature clears on RESET', () => {
+    const mock = makeMockManager()
+    const { result } = renderHook(() => useWallet(), { wrapper: makeWrapper(mock.manager) })
+
+    act(() => {
+      mock.machine.send({ type: 'CONNECT_INITIATED', walletId: 'phantom' })
+      mock.machine.send({
+        type: 'WALLET_CONNECTED',
+        publicKey: 'PK',
+        requireSignIn: true,
+      })
+      mock.machine.send({ type: 'SIGN_INITIATED' })
+      mock.machine.send({ type: 'SIGN_COMPLETED', signature: 'sig-b58' })
+    })
+    expect(result.current.signature).toBe('sig-b58')
+
+    act(() => {
+      mock.machine.send({ type: 'RESET' })
+    })
+    expect(result.current.signature).toBeNull()
   })
 
   it('isAuthenticated is true after the full flow with requireSignIn=true', () => {

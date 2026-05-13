@@ -6,7 +6,7 @@ import {
   type WalletConfig,
   type WalletManager,
 } from '@monolithlabs/wallet-connect-core'
-import { act, cleanup, render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -137,9 +137,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  // Explicit cleanup — testing-library's auto-cleanup hooks rely on a
-  // global `afterEach`, but vitest.shared.ts sets `globals: false`.
-  cleanup()
+  // DOM cleanup is owned by `packages/react/vitest.setup.ts`.
   vi.clearAllMocks()
 })
 
