@@ -1,3 +1,4 @@
 export { useWallet, type UseWalletReturn } from './composables/use-wallet'
 export { WalletConnectInjectionKey } from './context/injection-key'
 export { useWalletContext } from './context/use-wallet-context'
+export { WalletConnectPlugin } from './plugin/wallet-connect-plugin'
