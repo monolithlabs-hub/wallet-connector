@@ -8,6 +8,12 @@ concurrency:
   group: release
   cancel-in-progress: false
 
+# Opt JS-based actions (checkout, setup-node, pnpm/action-setup,
+# changesets/action) onto Node 24's runtime — same rationale as
+# `.github/workflows/ci.yml`.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   release:
     name: Release
@@ -25,10 +31,10 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
 
-      - name: Set up Node.js 22
+      - name: Set up Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
 
       - name: Install dependencies
