@@ -68,6 +68,8 @@ const SOLFLARE: WalletConfig = {
 
 const MOBILE_PLATFORM: PlatformInfo = {
   isMobile: true,
+  isIOS: true,
+  isAndroid: false,
   hasExtension: false,
   hasOpindexExtension: false,
   strategy: 'deeplink',
@@ -75,6 +77,8 @@ const MOBILE_PLATFORM: PlatformInfo = {
 
 const DESKTOP_NO_EXTENSION: PlatformInfo = {
   isMobile: false,
+  isIOS: false,
+  isAndroid: false,
   hasExtension: false,
   hasOpindexExtension: false,
   strategy: 'install-prompt',
@@ -82,6 +86,8 @@ const DESKTOP_NO_EXTENSION: PlatformInfo = {
 
 const DESKTOP_WITH_OPINDEX: PlatformInfo = {
   isMobile: false,
+  isIOS: false,
+  isAndroid: false,
   hasExtension: true,
   hasOpindexExtension: true,
   strategy: 'extension',

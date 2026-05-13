@@ -124,11 +124,7 @@ importers:
         specifier: ^19.2.6
         version: 19.2.6(react@19.2.6)
 
-  packages/ui:
-    dependencies:
-      '@monolithlabs/wallet-connect-core':
-        specifier: workspace:*
-        version: link:../core
+  packages/ui: {}
 
   packages/vue:
     dependencies:

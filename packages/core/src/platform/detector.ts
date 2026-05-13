@@ -17,8 +17,15 @@ export type PlatformStrategy = 'extension' | 'deeplink' | 'install-prompt'
  * well-known `window` properties; SSR-safe.
  */
 export interface PlatformInfo {
-  /** User agent matches `/iPhone|Android|iPad/i`. */
+  /** User agent matches `/iPhone|Android|iPad/i`. Equivalent to `isIOS || isAndroid`. */
   isMobile: boolean
+  /**
+   * User agent matches `/iPad|iPhone|iPod/i`. Used by UI helpers to pick
+   * the iOS-native install-button label ("Get" vs Android/desktop "Install").
+   */
+  isIOS: boolean
+  /** User agent matches `/Android/i`. */
+  isAndroid: boolean
   /** Any wallet has injected itself as `window.solana`. */
   hasExtension: boolean
   /** The Opindex extension is present (`window.opindex.isOpindex === true`). */
@@ -34,7 +41,8 @@ declare global {
   }
 }
 
-const MOBILE_UA_PATTERN = /iPhone|Android|iPad/i
+const IOS_UA_PATTERN = /iPad|iPhone|iPod/i
+const ANDROID_UA_PATTERN = /Android/i
 
 /**
  * Inspect the current environment and return the connection strategy plus
@@ -48,7 +56,10 @@ export function detectPlatform(): PlatformInfo {
   const hasWindow = typeof window !== 'undefined'
   const hasNavigator = typeof navigator !== 'undefined'
 
-  const isMobile = hasNavigator && MOBILE_UA_PATTERN.test(navigator.userAgent)
+  const ua = hasNavigator ? navigator.userAgent : ''
+  const isIOS = IOS_UA_PATTERN.test(ua)
+  const isAndroid = ANDROID_UA_PATTERN.test(ua)
+  const isMobile = isIOS || isAndroid
   const hasExtension = hasWindow && Boolean(window.solana)
   const hasOpindexExtension = hasWindow && Boolean(window.opindex?.isOpindex)
 
@@ -58,5 +69,5 @@ export function detectPlatform(): PlatformInfo {
       ? 'deeplink'
       : 'install-prompt'
 
-  return { isMobile, hasExtension, hasOpindexExtension, strategy }
+  return { isMobile, isIOS, isAndroid, hasExtension, hasOpindexExtension, strategy }
 }

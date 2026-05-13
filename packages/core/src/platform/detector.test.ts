@@ -19,6 +19,8 @@ describe('detectPlatform', () => {
 
     expect(detectPlatform()).toEqual({
       isMobile: true,
+      isIOS: true,
+      isAndroid: false,
       hasExtension: false,
       hasOpindexExtension: false,
       strategy: 'deeplink',
@@ -30,6 +32,8 @@ describe('detectPlatform', () => {
 
     expect(detectPlatform()).toEqual({
       isMobile: true,
+      isIOS: false,
+      isAndroid: true,
       hasExtension: false,
       hasOpindexExtension: false,
       strategy: 'deeplink',
@@ -42,6 +46,8 @@ describe('detectPlatform', () => {
 
     expect(detectPlatform()).toEqual({
       isMobile: false,
+      isIOS: false,
+      isAndroid: false,
       hasExtension: true,
       hasOpindexExtension: false,
       strategy: 'extension',
@@ -55,6 +61,8 @@ describe('detectPlatform', () => {
 
     expect(detectPlatform()).toEqual({
       isMobile: false,
+      isIOS: false,
+      isAndroid: false,
       hasExtension: true,
       hasOpindexExtension: true,
       strategy: 'extension',
@@ -67,6 +75,8 @@ describe('detectPlatform', () => {
 
     expect(detectPlatform()).toEqual({
       isMobile: true,
+      isIOS: true,
+      isAndroid: false,
       hasExtension: true,
       hasOpindexExtension: false,
       strategy: 'extension',
@@ -78,6 +88,8 @@ describe('detectPlatform', () => {
 
     expect(detectPlatform()).toEqual({
       isMobile: false,
+      isIOS: false,
+      isAndroid: false,
       hasExtension: false,
       hasOpindexExtension: false,
       strategy: 'install-prompt',
@@ -98,6 +110,8 @@ describe('detectPlatform', () => {
     expect(() => detectPlatform()).not.toThrow()
     expect(detectPlatform()).toEqual({
       isMobile: false,
+      isIOS: false,
+      isAndroid: false,
       hasExtension: false,
       hasOpindexExtension: false,
       strategy: 'install-prompt',

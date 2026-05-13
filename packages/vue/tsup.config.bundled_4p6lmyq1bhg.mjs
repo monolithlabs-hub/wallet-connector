@@ -1,0 +1,26 @@
+// tsup.config.ts
+import { defineConfig } from 'tsup'
+import Vue from 'unplugin-vue/esbuild'
+var tsup_config_default = defineConfig({
+  entry: ['src/index.ts'],
+  format: ['esm', 'cjs'],
+  // `.d.ts` emission is handled by `vue-tsc` (see `build:types` in
+  // package.json). tsup's built-in DTS uses Rollup, which doesn't
+  // understand `.vue` imports and fails. Two-step build (`tsup &&
+  // vue-tsc --emitDeclarationOnly`) cleanly separates JS bundling from
+  // type emission.
+  dts: false,
+  sourcemap: true,
+  clean: true,
+  treeshake: true,
+  outExtension({ format }) {
+    return { js: format === 'esm' ? '.mjs' : '.cjs' }
+  },
+  tsconfig: 'tsconfig.build.json',
+  // `unplugin-vue/esbuild` handles `.vue` SFC parsing for both the ESM
+  // and CJS passes. Templates compile to `h()` calls; script blocks
+  // run through esbuild's TS pipeline.
+  esbuildPlugins: [Vue()],
+})
+export { tsup_config_default as default }
+//# sourceMappingURL=data:application/json;base64,ewogICJ2ZXJzaW9uIjogMywKICAic291cmNlcyI6IFsidHN1cC5jb25maWcudHMiXSwKICAic291cmNlc0NvbnRlbnQiOiBbImNvbnN0IF9faW5qZWN0ZWRfZmlsZW5hbWVfXyA9IFwiL1VzZXJzL2RwYW5mZXJvdi9Qcm9qZWN0cy9vcGluY3VyL3dhbGxldC1jb25uZWN0b3IvcGFja2FnZXMvdnVlL3RzdXAuY29uZmlnLnRzXCI7Y29uc3QgX19pbmplY3RlZF9kaXJuYW1lX18gPSBcIi9Vc2Vycy9kcGFuZmVyb3YvUHJvamVjdHMvb3BpbmN1ci93YWxsZXQtY29ubmVjdG9yL3BhY2thZ2VzL3Z1ZVwiO2NvbnN0IF9faW5qZWN0ZWRfaW1wb3J0X21ldGFfdXJsX18gPSBcImZpbGU6Ly8vVXNlcnMvZHBhbmZlcm92L1Byb2plY3RzL29waW5jdXIvd2FsbGV0LWNvbm5lY3Rvci9wYWNrYWdlcy92dWUvdHN1cC5jb25maWcudHNcIjtpbXBvcnQgeyBkZWZpbmVDb25maWcgfSBmcm9tICd0c3VwJ1xuaW1wb3J0IFZ1ZSBmcm9tICd1bnBsdWdpbi12dWUvZXNidWlsZCdcblxuZXhwb3J0IGRlZmF1bHQgZGVmaW5lQ29uZmlnKHtcbiAgZW50cnk6IFsnc3JjL2luZGV4LnRzJ10sXG4gIGZvcm1hdDogWydlc20nLCAnY2pzJ10sXG4gIC8vIGAuZC50c2AgZW1pc3Npb24gaXMgaGFuZGxlZCBieSBgdnVlLXRzY2AgKHNlZSBgYnVpbGQ6dHlwZXNgIGluXG4gIC8vIHBhY2thZ2UuanNvbikuIHRzdXAncyBidWlsdC1pbiBEVFMgdXNlcyBSb2xsdXAsIHdoaWNoIGRvZXNuJ3RcbiAgLy8gdW5kZXJzdGFuZCBgLnZ1ZWAgaW1wb3J0cyBhbmQgZmFpbHMuIFR3by1zdGVwIGJ1aWxkIChgdHN1cCAmJlxuICAvLyB2dWUtdHNjIC0tZW1pdERlY2xhcmF0aW9uT25seWApIGNsZWFubHkgc2VwYXJhdGVzIEpTIGJ1bmRsaW5nIGZyb21cbiAgLy8gdHlwZSBlbWlzc2lvbi5cbiAgZHRzOiBmYWxzZSxcbiAgc291cmNlbWFwOiB0cnVlLFxuICBjbGVhbjogdHJ1ZSxcbiAgdHJlZXNoYWtlOiB0cnVlLFxuICBvdXRFeHRlbnNpb24oeyBmb3JtYXQgfSkge1xuICAgIHJldHVybiB7IGpzOiBmb3JtYXQgPT09ICdlc20nID8gJy5tanMnIDogJy5janMnIH1cbiAgfSxcbiAgdHNjb25maWc6ICd0c2NvbmZpZy5idWlsZC5qc29uJyxcbiAgLy8gYHVucGx1Z2luLXZ1ZS9lc2J1aWxkYCBoYW5kbGVzIGAudnVlYCBTRkMgcGFyc2luZyBmb3IgYm90aCB0aGUgRVNNXG4gIC8vIGFuZCBDSlMgcGFzc2VzLiBUZW1wbGF0ZXMgY29tcGlsZSB0byBgaCgpYCBjYWxsczsgc2NyaXB0IGJsb2Nrc1xuICAvLyBydW4gdGhyb3VnaCBlc2J1aWxkJ3MgVFMgcGlwZWxpbmUuXG4gIGVzYnVpbGRQbHVnaW5zOiBbVnVlKCldLFxufSlcbiJdLAogICJtYXBwaW5ncyI6ICI7QUFBMlUsU0FBUyxvQkFBb0I7QUFDeFcsT0FBTyxTQUFTO0FBRWhCLElBQU8sc0JBQVEsYUFBYTtBQUFBLEVBQzFCLE9BQU8sQ0FBQyxjQUFjO0FBQUEsRUFDdEIsUUFBUSxDQUFDLE9BQU8sS0FBSztBQUFBO0FBQUE7QUFBQTtBQUFBO0FBQUE7QUFBQSxFQU1yQixLQUFLO0FBQUEsRUFDTCxXQUFXO0FBQUEsRUFDWCxPQUFPO0FBQUEsRUFDUCxXQUFXO0FBQUEsRUFDWCxhQUFhLEVBQUUsT0FBTyxHQUFHO0FBQ3ZCLFdBQU8sRUFBRSxJQUFJLFdBQVcsUUFBUSxTQUFTLE9BQU87QUFBQSxFQUNsRDtBQUFBLEVBQ0EsVUFBVTtBQUFBO0FBQUE7QUFBQTtBQUFBLEVBSVYsZ0JBQWdCLENBQUMsSUFBSSxDQUFDO0FBQ3hCLENBQUM7IiwKICAibmFtZXMiOiBbXQp9Cg==

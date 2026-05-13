@@ -19,18 +19,24 @@ const backpack: WalletConfig = { id: 'backpack', name: 'Backpack', priority: 3, 
 
 const MOBILE: PlatformInfo = {
   isMobile: true,
+  isIOS: true,
+  isAndroid: false,
   hasExtension: false,
   hasOpindexExtension: false,
   strategy: 'deeplink',
 }
 const DESKTOP_WITH_OPINDEX: PlatformInfo = {
   isMobile: false,
+  isIOS: false,
+  isAndroid: false,
   hasExtension: true,
   hasOpindexExtension: true,
   strategy: 'extension',
 }
 const DESKTOP_NO_EXT: PlatformInfo = {
   isMobile: false,
+  isIOS: false,
+  isAndroid: false,
   hasExtension: false,
   hasOpindexExtension: false,
   strategy: 'install-prompt',

@@ -28,7 +28,5 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
-  "dependencies": {
-    "@monolithlabs/wallet-connect-core": "workspace:*"
-  }
+  "dependencies": {}
 }
