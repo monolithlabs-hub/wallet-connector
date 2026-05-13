@@ -1,0 +1,216 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import {
+  type PendingState,
+  clearPendingState,
+  createPendingState,
+  getLastUsedWallet,
+  getPendingState,
+  saveLastUsedWallet,
+  savePendingState,
+} from './store'
+
+describe('SessionStore', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    sessionStorage.clear()
+    localStorage.clear()
+    clearPendingState()
+  })
+
+  it('saves and retrieves pending state', () => {
+    const state = createPendingState({
+      walletId: 'phantom',
+      requireSignIn: true,
+      ephemeralPublicKey: 'fakePub',
+      ephemeralSecretKey: 'fakeSec',
+    })
+    savePendingState(state)
+
+    expect(getPendingState()).toEqual(state)
+  })
+
+  it('returns null when no pending state exists', () => {
+    expect(getPendingState()).toBeNull()
+  })
+
+  it('returns null for state older than 10 minutes', () => {
+    const stale: PendingState = {
+      walletId: 'phantom',
+      requireSignIn: false,
+      timestamp: Date.now() - 10 * 60 * 1000 - 1,
+      ephemeralPublicKey: 'fakePub',
+      ephemeralSecretKey: 'fakeSec',
+    }
+    savePendingState(stale)
+
+    expect(getPendingState()).toBeNull()
+  })
+
+  it('clears stale state as a side effect of getPendingState', () => {
+    const stale: PendingState = {
+      walletId: 'phantom',
+      requireSignIn: false,
+      timestamp: Date.now() - 20 * 60 * 1000,
+      ephemeralPublicKey: 'fakePub',
+      ephemeralSecretKey: 'fakeSec',
+    }
+    savePendingState(stale)
+
+    getPendingState()
+
+    expect(sessionStorage.getItem('@monolithlabs/wc:pendingState')).toBeNull()
+  })
+
+  it('clearPendingState removes state', () => {
+    savePendingState(
+      createPendingState({
+        walletId: 'phantom',
+        requireSignIn: false,
+        ephemeralPublicKey: 'fakePub',
+        ephemeralSecretKey: 'fakeSec',
+      }),
+    )
+    clearPendingState()
+
+    expect(getPendingState()).toBeNull()
+  })
+
+  it('saves and retrieves lastUsedWallet', () => {
+    saveLastUsedWallet('phantom')
+
+    expect(getLastUsedWallet()).toBe('phantom')
+  })
+
+  it('getLastUsedWallet returns null when none has been set', () => {
+    expect(getLastUsedWallet()).toBeNull()
+  })
+
+  it('does not throw when sessionStorage is unavailable', () => {
+    vi.stubGlobal('sessionStorage', undefined)
+    const state = createPendingState({
+      walletId: 'phantom',
+      requireSignIn: false,
+      ephemeralPublicKey: 'fakePub',
+      ephemeralSecretKey: 'fakeSec',
+    })
+
+    expect(() => savePendingState(state)).not.toThrow()
+    expect(() => getPendingState()).not.toThrow()
+    expect(() => clearPendingState()).not.toThrow()
+  })
+
+  it('does not throw when localStorage is unavailable', () => {
+    vi.stubGlobal('localStorage', undefined)
+
+    expect(() => saveLastUsedWallet('phantom')).not.toThrow()
+    expect(() => getLastUsedWallet()).not.toThrow()
+  })
+
+  it('falls back to in-memory store when sessionStorage is unavailable', () => {
+    vi.stubGlobal('sessionStorage', undefined)
+    const state = createPendingState({
+      walletId: 'phantom',
+      requireSignIn: true,
+      ephemeralPublicKey: 'fakePub',
+      ephemeralSecretKey: 'fakeSec',
+    })
+
+    savePendingState(state)
+
+    expect(getPendingState()).toEqual(state)
+  })
+
+  it('falls back to in-memory store when localStorage is unavailable', () => {
+    vi.stubGlobal('localStorage', undefined)
+    saveLastUsedWallet('solflare')
+
+    expect(getLastUsedWallet()).toBe('solflare')
+  })
+
+  it('createPendingState includes signInMessage when provided', () => {
+    const state = createPendingState({
+      walletId: 'phantom',
+      requireSignIn: true,
+      signInMessage: 'Sign in to Opindex',
+      ephemeralPublicKey: 'fakePub',
+      ephemeralSecretKey: 'fakeSec',
+    })
+
+    expect(state.signInMessage).toBe('Sign in to Opindex')
+  })
+
+  it('createPendingState carries the ephemeral keypair fields', () => {
+    const state = createPendingState({
+      walletId: 'phantom',
+      requireSignIn: false,
+      ephemeralPublicKey: 'pubB58',
+      ephemeralSecretKey: 'secB58',
+    })
+
+    expect(state.ephemeralPublicKey).toBe('pubB58')
+    expect(state.ephemeralSecretKey).toBe('secB58')
+  })
+
+  it('returns null on corrupt JSON in sessionStorage', () => {
+    sessionStorage.setItem('@monolithlabs/wc:pendingState', '{ not json')
+
+    expect(getPendingState()).toBeNull()
+  })
+
+  it('returns null and clears the entry when the persisted JSON has a wrong-shape field', () => {
+    // walletId is a number instead of a string — would slip past a plain
+    // JSON.parse + `as PendingState` cast and explode downstream.
+    sessionStorage.setItem(
+      '@monolithlabs/wc:pendingState',
+      JSON.stringify({
+        walletId: 42,
+        requireSignIn: false,
+        timestamp: Date.now(),
+        ephemeralPublicKey: 'fakePub',
+        ephemeralSecretKey: 'fakeSec',
+      }),
+    )
+
+    expect(getPendingState()).toBeNull()
+    expect(sessionStorage.getItem('@monolithlabs/wc:pendingState')).toBeNull()
+  })
+
+  it('returns null and clears the entry when a required field is missing', () => {
+    sessionStorage.setItem(
+      '@monolithlabs/wc:pendingState',
+      JSON.stringify({
+        walletId: 'phantom',
+        requireSignIn: false,
+        // missing timestamp
+        ephemeralPublicKey: 'fakePub',
+        ephemeralSecretKey: 'fakeSec',
+      }),
+    )
+
+    expect(getPendingState()).toBeNull()
+    expect(sessionStorage.getItem('@monolithlabs/wc:pendingState')).toBeNull()
+  })
+
+  it('returns null when the persisted value is not an object', () => {
+    sessionStorage.setItem('@monolithlabs/wc:pendingState', JSON.stringify('not-an-object'))
+
+    expect(getPendingState()).toBeNull()
+  })
+
+  it('rejects records whose optional signInMessage is the wrong type', () => {
+    sessionStorage.setItem(
+      '@monolithlabs/wc:pendingState',
+      JSON.stringify({
+        walletId: 'phantom',
+        requireSignIn: true,
+        timestamp: Date.now(),
+        ephemeralPublicKey: 'fakePub',
+        ephemeralSecretKey: 'fakeSec',
+        signInMessage: 123, // should be string
+      }),
+    )
+
+    expect(getPendingState()).toBeNull()
+  })
+})

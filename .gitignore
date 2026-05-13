@@ -13,6 +13,11 @@ dist
 .turbo
 coverage
 
+# Copied into packages/core/ by its `prepack` script; removed by `postpack`.
+# Source-of-truth lives at the repo root.
+packages/core/NOTICE
+packages/core/THIRD_PARTY_LICENSES.md
+
 .vscode/*
 
 
