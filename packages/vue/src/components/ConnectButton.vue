@@ -65,7 +65,22 @@ const emit = defineEmits<{
   authenticated: [publicKey: string, signature: string]
 }>()
 
-const wallet = useWallet()
+// Destructure the composable return so `<template>` can auto-unwrap the
+// refs (Vue only auto-unwraps top-level refs — `wallet.publicKey` would
+// stay wrapped, but `publicKey` doesn't). `wallet` is renamed to
+// `activeWallet` to avoid shadowing the composable itself.
+const {
+  state,
+  publicKey,
+  signature,
+  wallet: activeWallet,
+  sortedWallets,
+  error,
+  disconnecting,
+  connect,
+  disconnect,
+} = useWallet()
+
 const open = ref(false)
 // Platform is read once per mount and cached. `detectPlatform()` reads
 // `navigator`; it's SSR-safe (returns `install-prompt` on the server).
@@ -92,9 +107,9 @@ function badgeFor(walletConfig: WalletConfig): 'Get' | 'Install' | null {
 }
 
 const truncated = computed<string | null>(() =>
-  wallet.publicKey.value ? truncatePublicKey(wallet.publicKey.value) : null,
+  publicKey.value ? truncatePublicKey(publicKey.value) : null,
 )
-const isConnected = computed(() => isFlowStateConnected(wallet.state.value))
+const isConnected = computed(() => isFlowStateConnected(state.value))
 const buttonLabel = computed(() =>
   isConnected.value ? (truncated.value ?? props.connectedLabel) : props.label,
 )
@@ -103,7 +118,7 @@ const buttonAriaLabel = computed(() =>
 )
 const modalTitle = computed(() => (isConnected.value ? 'Connected' : 'Select a wallet'))
 const walletItemsDisabled = computed(
-  () => wallet.state.value === 'connecting' || wallet.state.value === 'signing',
+  () => state.value === 'connecting' || state.value === 'signing',
 )
 
 // Transition watcher for `connected` / `authenticated` emits + auto-close.
@@ -114,21 +129,21 @@ const walletItemsDisabled = computed(
 // close timing is unchanged. For `requireSignIn: true` flows the modal
 // stays open through the `signing` state — the user keeps seeing the
 // dialog while their wallet shows a sign prompt.
-let prevState: FlowState = wallet.state.value
-watch(wallet.state, (curr) => {
+let prevState: FlowState = state.value
+watch(state, (curr) => {
   const prev = prevState
   prevState = curr
 
   const wasConnected = isFlowStateConnected(prev)
   const isNowConnected = isFlowStateConnected(curr)
 
-  if (!wasConnected && isNowConnected && wallet.publicKey.value) {
-    emit('connected', wallet.publicKey.value)
+  if (!wasConnected && isNowConnected && publicKey.value) {
+    emit('connected', publicKey.value)
   }
 
   if (prev !== 'authenticated' && curr === 'authenticated') {
-    if (wallet.publicKey.value && wallet.signature.value) {
-      emit('authenticated', wallet.publicKey.value, wallet.signature.value)
+    if (publicKey.value && signature.value) {
+      emit('authenticated', publicKey.value, signature.value)
     }
     open.value = false
   }
@@ -136,15 +151,15 @@ watch(wallet.state, (curr) => {
 
 async function handleSelectWallet(walletId: string): Promise<void> {
   try {
-    await wallet.connect(walletId)
+    await connect(walletId)
   } catch {
-    // Errors land on wallet.error; the modal renders that branch.
+    // Errors land on `error`; the modal renders that branch.
   }
 }
 
 async function handleDisconnect(): Promise<void> {
   try {
-    await wallet.disconnect()
+    await disconnect()
   } catch {
     // Best-effort. The FlowMachine RESET runs unconditionally.
   }
@@ -382,32 +397,25 @@ const connectedViewStyle: CSSProperties = {
         </header>
         <div>
           <!-- Connected view -->
-          <div
-            v-if="isConnected && wallet.publicKey.value"
-            :style="connectedViewStyle"
-          >
-            <p v-if="wallet.wallet.value" :style="{ margin: '0', fontWeight: 600 }">
-              {{ wallet.wallet.value.name }}
+          <div v-if="isConnected && publicKey" :style="connectedViewStyle">
+            <p v-if="activeWallet" :style="{ margin: '0', fontWeight: 600 }">
+              {{ activeWallet.name }}
             </p>
             <p :style="{ margin: '0', fontFamily: 'monospace', wordBreak: 'break-all' }">
-              {{ wallet.publicKey.value }}
+              {{ publicKey }}
             </p>
             <button
               type="button"
-              :disabled="wallet.disconnecting.value"
+              :disabled="disconnecting"
               :style="disconnectButtonStyle"
               @click="handleDisconnect"
             >
-              {{ wallet.disconnecting.value ? 'Disconnecting…' : 'Disconnect' }}
+              {{ disconnecting ? 'Disconnecting…' : 'Disconnect' }}
             </button>
           </div>
           <!-- Wallet list -->
-          <ul
-            v-else-if="wallet.sortedWallets.value.length > 0"
-            role="list"
-            :style="walletListStyle"
-          >
-            <li v-for="w in wallet.sortedWallets.value" :key="w.id" :style="{ margin: '0' }">
+          <ul v-else-if="sortedWallets.length > 0" role="list" :style="walletListStyle">
+            <li v-for="w in sortedWallets" :key="w.id" :style="{ margin: '0' }">
               <button
                 type="button"
                 :data-wallet-id="w.id"
@@ -423,17 +431,10 @@ const connectedViewStyle: CSSProperties = {
                   height="24"
                   :style="{ borderRadius: '4px' }"
                 />
-                <span
-                  v-else
-                  aria-hidden="true"
-                  :style="walletIconPlaceholderStyle"
-                />
+                <span v-else aria-hidden="true" :style="walletIconPlaceholderStyle" />
                 <span :style="{ flex: 1, textAlign: 'left' }">{{ w.name }}</span>
                 <span
-                  v-if="
-                    wallet.state.value === 'connecting' &&
-                    wallet.wallet.value?.id === w.id
-                  "
+                  v-if="state === 'connecting' && activeWallet?.id === w.id"
                   :style="walletStatusStyle"
                 >
                   Connecting…
@@ -443,17 +444,11 @@ const connectedViewStyle: CSSProperties = {
                 </span>
               </button>
             </li>
-            <li
-              v-if="wallet.error.value?.message"
-              role="alert"
-              :style="errorRowStyle"
-            >
-              {{ wallet.error.value.message }}
+            <li v-if="error?.message" role="alert" :style="errorRowStyle">
+              {{ error.message }}
             </li>
           </ul>
-          <p v-else :style="{ padding: '12px 16px', margin: '0' }">
-            No wallets configured.
-          </p>
+          <p v-else :style="{ padding: '12px 16px', margin: '0' }">No wallets configured.</p>
         </div>
       </div>
     </div>

@@ -169,6 +169,19 @@ describe('ConnectButton.vue', () => {
     expect(wrapper.get('button').text()).toBe('Sign in')
   })
 
+  it('shows the empty state when no wallets are configured', async () => {
+    // Edge case for the `v-else` branch in the modal — both wallets-empty
+    // AND not-connected. Doubles as documentation of what consumers see
+    // if they wire up an empty `wallets` array.
+    const mock = makeMockManager({ wallets: [] })
+    const wrapper = mountButton(mock.manager)
+
+    await wrapper.get('button').trigger('click')
+    const dialog = getDialog()
+    expect(dialog).not.toBeNull()
+    expect(dialog?.textContent).toContain('No wallets configured')
+  })
+
   it('clicking the button opens the wallet modal', async () => {
     const mock = makeMockManager({ wallets: [PHANTOM, SOLFLARE] })
     const wrapper = mountButton(mock.manager)
@@ -299,6 +312,12 @@ describe('ConnectButton.vue', () => {
     expect(disconnectBtn).toBeDefined()
 
     disconnectBtn!.click()
+    // Two awaits because two async hops:
+    //   1. flushPromises — resolves the `await disconnect()` inside
+    //      `handleDisconnect` and lets `open.value = false` run.
+    //   2. nextTick — flushes Vue's reactive effects (the watch on
+    //      `open` removing the keydown listener, the template re-render
+    //      that reverts the trigger button text).
     await flushPromises()
     await nextTick()
 
