@@ -28,7 +28,8 @@
     "build": "tsup",
     "test": "vitest run --coverage",
     "lint": "eslint . --max-warnings=0",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "prepack": "cp ../../NOTICE ../../THIRD_PARTY_LICENSES.md ."
   },
   "dependencies": {
     "@solana/wallet-standard-features": "^1.3.0",
@@ -37,13 +38,5 @@
     "@wallet-standard/features": "^1.1.0",
     "bs58": "^6.0.0",
     "tweetnacl": "^1.0.3"
-  },
-  "peerDependencies": {
-    "@solana/web3.js": "^1.98.0"
-  },
-  "peerDependenciesMeta": {
-    "@solana/web3.js": {
-      "optional": false
-    }
   }
 }

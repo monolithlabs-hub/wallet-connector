@@ -151,6 +151,7 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
 
   let destroyed = false
   let inflightConnect: Promise<void> | null = null
+  let inflightWalletId: string | null = null
 
   function assertAlive(): void {
     if (destroyed) throw new Error('WalletManager has been destroyed')
@@ -205,11 +206,20 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
 
   async function connect(walletId: string): Promise<void> {
     assertAlive()
-    // Single-flight: concurrent callers share one in-flight promise. The
-    // adapters have their own guards (TASK-107 / TASK-108) but at the
-    // FlowMachine level a second CONNECT_INITIATED from 'connecting' would
-    // throw "Invalid transition" — return the prior promise instead.
-    if (inflightConnect) return inflightConnect
+    // Single-flight: concurrent callers for the SAME wallet share one
+    // in-flight promise. The adapters have their own guards (TASK-107 /
+    // TASK-108) but at the FlowMachine level a second CONNECT_INITIATED
+    // from 'connecting' would throw "Invalid transition" — return the
+    // prior promise instead. A call for a DIFFERENT wallet while one is
+    // in-flight rejects loudly: silently discarding the new walletId
+    // would be confusing UI behavior (user clicks Phantom, then
+    // Solflare, and gets a Phantom connection).
+    if (inflightConnect) {
+      if (inflightWalletId === walletId) return inflightConnect
+      throw new WalletConnectionError(
+        `connect('${walletId}') was called while a connect('${inflightWalletId ?? '?'}') is still in flight. Wait for it to settle or call disconnect() first.`,
+      )
+    }
 
     // Auto-reset on retry: CONNECT_INITIATED is only valid from 'idle',
     // so a previous flow that ended in 'error', 'authenticated', etc.
@@ -219,11 +229,13 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
       machine.send({ type: 'RESET' })
     }
 
+    inflightWalletId = walletId
     inflightConnect = doConnect(walletId)
     try {
       return await inflightConnect
     } finally {
       inflightConnect = null
+      inflightWalletId = null
     }
   }
 

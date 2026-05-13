@@ -323,4 +323,69 @@ describe('FlowMachine', () => {
     m.send({ type: 'CONNECT_INITIATED', walletId: 'phantom' })
     expect(m.getState()).toBe('connecting')
   })
+
+  it.each([
+    {
+      label: 'wrong-typed walletId',
+      context: {
+        walletId: 42,
+        publicKey: null,
+        signature: null,
+        requireSignIn: false,
+        error: null,
+      },
+    },
+    {
+      label: 'wrong-typed publicKey',
+      context: {
+        walletId: null,
+        publicKey: 12345,
+        signature: null,
+        requireSignIn: false,
+        error: null,
+      },
+    },
+    {
+      label: 'missing requireSignIn',
+      context: { walletId: null, publicKey: null, signature: null, error: null },
+    },
+    {
+      label: 'wrong-shape error',
+      context: {
+        walletId: null,
+        publicKey: null,
+        signature: null,
+        requireSignIn: false,
+        error: 'oops',
+      },
+    },
+    {
+      label: 'error object missing message',
+      context: {
+        walletId: null,
+        publicKey: null,
+        signature: null,
+        requireSignIn: false,
+        error: { name: 'WalletError' },
+      },
+    },
+  ])(
+    'createFlowMachine rejects a tampered snapshot.context ($label) and falls back to idle',
+    ({ context }) => {
+      const tampered = { state: 'connecting', context } as unknown as Parameters<
+        typeof createFlowMachine
+      >[0]
+
+      const m = createFlowMachine(tampered)
+
+      expect(m.getState()).toBe('idle')
+      expect(m.getContext()).toEqual({
+        walletId: null,
+        publicKey: null,
+        signature: null,
+        requireSignIn: false,
+        error: null,
+      })
+    },
+  )
 })

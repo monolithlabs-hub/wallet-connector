@@ -10,8 +10,6 @@ import {
   savePendingState,
 } from './store'
 
-const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
 describe('SessionStore', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -40,7 +38,6 @@ describe('SessionStore', () => {
     const stale: PendingState = {
       walletId: 'phantom',
       requireSignIn: false,
-      nonce: '00000000-0000-4000-8000-000000000000',
       timestamp: Date.now() - 10 * 60 * 1000 - 1,
       ephemeralPublicKey: 'fakePub',
       ephemeralSecretKey: 'fakeSec',
@@ -54,7 +51,6 @@ describe('SessionStore', () => {
     const stale: PendingState = {
       walletId: 'phantom',
       requireSignIn: false,
-      nonce: '00000000-0000-4000-8000-000000000000',
       timestamp: Date.now() - 20 * 60 * 1000,
       ephemeralPublicKey: 'fakePub',
       ephemeralSecretKey: 'fakeSec',
@@ -132,34 +128,6 @@ describe('SessionStore', () => {
     expect(getLastUsedWallet()).toBe('solflare')
   })
 
-  it('createPendingState generates a UUID v4 nonce', () => {
-    const state = createPendingState({
-      walletId: 'phantom',
-      requireSignIn: false,
-      ephemeralPublicKey: 'fakePub',
-      ephemeralSecretKey: 'fakeSec',
-    })
-
-    expect(state.nonce).toMatch(UUID_V4)
-  })
-
-  it('createPendingState produces a unique nonce per call', () => {
-    const a = createPendingState({
-      walletId: 'phantom',
-      requireSignIn: false,
-      ephemeralPublicKey: 'fakePub',
-      ephemeralSecretKey: 'fakeSec',
-    })
-    const b = createPendingState({
-      walletId: 'phantom',
-      requireSignIn: false,
-      ephemeralPublicKey: 'fakePub',
-      ephemeralSecretKey: 'fakeSec',
-    })
-
-    expect(a.nonce).not.toBe(b.nonce)
-  })
-
   it('createPendingState includes signInMessage when provided', () => {
     const state = createPendingState({
       walletId: 'phantom',
@@ -186,6 +154,62 @@ describe('SessionStore', () => {
 
   it('returns null on corrupt JSON in sessionStorage', () => {
     sessionStorage.setItem('@monolithlabs/wc:pendingState', '{ not json')
+
+    expect(getPendingState()).toBeNull()
+  })
+
+  it('returns null and clears the entry when the persisted JSON has a wrong-shape field', () => {
+    // walletId is a number instead of a string — would slip past a plain
+    // JSON.parse + `as PendingState` cast and explode downstream.
+    sessionStorage.setItem(
+      '@monolithlabs/wc:pendingState',
+      JSON.stringify({
+        walletId: 42,
+        requireSignIn: false,
+        timestamp: Date.now(),
+        ephemeralPublicKey: 'fakePub',
+        ephemeralSecretKey: 'fakeSec',
+      }),
+    )
+
+    expect(getPendingState()).toBeNull()
+    expect(sessionStorage.getItem('@monolithlabs/wc:pendingState')).toBeNull()
+  })
+
+  it('returns null and clears the entry when a required field is missing', () => {
+    sessionStorage.setItem(
+      '@monolithlabs/wc:pendingState',
+      JSON.stringify({
+        walletId: 'phantom',
+        requireSignIn: false,
+        // missing timestamp
+        ephemeralPublicKey: 'fakePub',
+        ephemeralSecretKey: 'fakeSec',
+      }),
+    )
+
+    expect(getPendingState()).toBeNull()
+    expect(sessionStorage.getItem('@monolithlabs/wc:pendingState')).toBeNull()
+  })
+
+  it('returns null when the persisted value is not an object', () => {
+    sessionStorage.setItem('@monolithlabs/wc:pendingState', JSON.stringify('not-an-object'))
+
+    expect(getPendingState()).toBeNull()
+  })
+
+  it('rejects records whose optional signInMessage is the wrong type', () => {
+    sessionStorage.setItem(
+      '@monolithlabs/wc:pendingState',
+      JSON.stringify({
+        walletId: 'phantom',
+        requireSignIn: true,
+        timestamp: Date.now(),
+        ephemeralPublicKey: 'fakePub',
+        ephemeralSecretKey: 'fakeSec',
+        signInMessage: 123, // should be string
+      }),
+    )
 
     expect(getPendingState()).toBeNull()
   })

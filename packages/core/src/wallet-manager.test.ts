@@ -289,7 +289,6 @@ describe('createWalletManager — mobile / deep-link path', () => {
     mocks.getPendingState.mockReturnValue({
       walletId: 'phantom',
       requireSignIn: false,
-      nonce: '00000000-0000-4000-8000-000000000000',
       timestamp: Date.now(),
       ephemeralPublicKey: 'pub',
       ephemeralSecretKey: 'sec',
@@ -317,7 +316,6 @@ describe('createWalletManager — mobile / deep-link path', () => {
     mocks.getPendingState.mockReturnValue({
       walletId: 'phantom',
       requireSignIn: true,
-      nonce: '00000000-0000-4000-8000-000000000000',
       timestamp: Date.now(),
       ephemeralPublicKey: 'pub',
       ephemeralSecretKey: 'sec',
@@ -356,7 +354,6 @@ describe('createWalletManager — mobile / deep-link path', () => {
     mocks.getPendingState.mockReturnValue({
       walletId: 'phantom',
       requireSignIn: false,
-      nonce: '00000000-0000-4000-8000-000000000000',
       timestamp: Date.now(),
       ephemeralPublicKey: 'pub',
       ephemeralSecretKey: 'sec',
@@ -728,6 +725,48 @@ describe('createWalletManager — retry semantics', () => {
 
     expect((slowAdapter.connect as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1)
     expect(manager.getState()).toBe('authenticated')
+  })
+
+  it('rejects connect() for a different wallet while another connect is in flight', async () => {
+    type Resolver = (result: { publicKey: string }) => void
+    const deferred: { resolve: Resolver | null } = { resolve: null }
+    const phantomAdapter: StandardWalletAdapter = {
+      wallet: { name: 'Phantom' } as unknown as StandardWalletAdapter['wallet'],
+      publicKey: null,
+      isConnected: false,
+      connect: vi.fn(
+        () =>
+          new Promise<{ publicKey: string }>((res) => {
+            deferred.resolve = res
+          }),
+      ),
+      disconnect: vi.fn(async () => undefined),
+      signMessage: vi.fn(),
+      signIn: vi.fn(),
+      subscribe: vi.fn(() => () => {}),
+      destroy: vi.fn(),
+    } as unknown as StandardWalletAdapter
+    const solflareAdapter: StandardWalletAdapter = {
+      ...phantomAdapter,
+      wallet: { name: 'Solflare' } as unknown as StandardWalletAdapter['wallet'],
+      connect: vi.fn(async () => ({ publicKey: 'PK_SOLFLARE' })),
+    } as unknown as StandardWalletAdapter
+    mocks.discoverStandardWallets.mockReturnValue(
+      makeDiscoveryHandle([phantomAdapter, solflareAdapter]),
+    )
+    const manager = createWalletManager({ wallets: [PHANTOM, SOLFLARE] })
+
+    const p1 = manager.connect('phantom')
+    await Promise.resolve()
+    // Different walletId while phantom is in flight: reject loudly rather
+    // than silently returning the phantom promise.
+    await expect(manager.connect('solflare')).rejects.toThrow(/in flight/i)
+    expect((solflareAdapter.connect as ReturnType<typeof vi.fn>).mock.calls.length).toBe(0)
+
+    deferred.resolve?.({ publicKey: 'PK' })
+    await p1
+    // After phantom settles, solflare can proceed normally.
+    await expect(manager.connect('solflare')).resolves.toBeUndefined()
   })
 })
 

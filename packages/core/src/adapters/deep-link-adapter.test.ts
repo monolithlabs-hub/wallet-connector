@@ -445,7 +445,6 @@ describe('DeepLinkAdapter.resumeFromCallback', () => {
     const stale = {
       walletId: 'phantom',
       requireSignIn: false,
-      nonce: '00000000-0000-4000-8000-000000000000',
       timestamp: Date.now(),
     }
     sessionStorage.setItem('@monolithlabs/wc:pendingState', JSON.stringify(stale))

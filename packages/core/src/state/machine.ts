@@ -82,6 +82,24 @@ function isValidFlowState(value: unknown): value is FlowState {
   return typeof value === 'string' && VALID_STATES.has(value as FlowState)
 }
 
+function isValidSerializedFlow(value: unknown): value is SerializedFlow {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  if (!isValidFlowState(v.state)) return false
+  if (typeof v.context !== 'object' || v.context === null) return false
+  const ctx = v.context as Record<string, unknown>
+  if (ctx.walletId !== null && typeof ctx.walletId !== 'string') return false
+  if (ctx.publicKey !== null && typeof ctx.publicKey !== 'string') return false
+  if (ctx.signature !== null && typeof ctx.signature !== 'string') return false
+  if (typeof ctx.requireSignIn !== 'boolean') return false
+  if (ctx.error !== null) {
+    if (typeof ctx.error !== 'object') return false
+    const e = ctx.error as Record<string, unknown>
+    if (typeof e.name !== 'string' || typeof e.message !== 'string') return false
+  }
+  return true
+}
+
 /**
  * Build a {@link FlowMachine}. Pass a {@link SerializedFlow} to restore a
  * snapshot (used to resume a mobile deep-link flow after the wallet
@@ -99,8 +117,12 @@ function isValidFlowState(value: unknown): value is FlowState {
  * Any other (event, state) pair throws a descriptive `Error`.
  */
 export function createFlowMachine(snapshot?: SerializedFlow): FlowMachine {
-  let state: FlowState = isValidFlowState(snapshot?.state) ? snapshot.state : 'idle'
-  const context: FlowContext = restoreContext(snapshot)
+  // If the snapshot's state OR context shape is invalid, fall back to a
+  // fresh idle machine. Persisted snapshots are a trust boundary —
+  // sessionStorage can be tampered with or carry an older schema.
+  const validSnapshot = isValidSerializedFlow(snapshot) ? snapshot : undefined
+  let state: FlowState = validSnapshot ? validSnapshot.state : 'idle'
+  const context: FlowContext = restoreContext(validSnapshot)
   const listeners = new Set<StateListener>()
   let isSending = false
 
