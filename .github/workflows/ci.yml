@@ -9,6 +9,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Opt JS-based actions (checkout, setup-node, pnpm/action-setup, etc.)
+# onto Node 24's runtime. GitHub deprecated Node 20 for actions in
+# Sep 2025; this avoids the warning until the action authors ship
+# Node 24 builds by default. Safe to remove once that happens.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   ci:
     name: CI / Node ${{ matrix.node }}
@@ -16,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [22, 24]
+        node: [24]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
