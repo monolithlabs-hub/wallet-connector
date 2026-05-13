@@ -85,7 +85,10 @@ export type {
   Unsubscribe,
 } from './state/machine'
 
+export { createWalletManager } from './wallet-manager'
+export type { WalletManager, WalletManagerConfig } from './wallet-manager'
+
 export { getSortedWallets } from './wallets/sorter'
-export type { WalletConfig } from './wallets/sorter'
+export type { SortOptions, WalletConfig } from './wallets/sorter'
 
 export { asWalletName, type WalletName } from './wallet-name'

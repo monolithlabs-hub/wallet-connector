@@ -29,13 +29,26 @@ export interface WalletConfig {
   standardName?: WalletName
 }
 
-const OPINDEX_ID = 'opindex'
+const DEFAULT_PINNED_WALLET_ID = 'opindex'
+
+/** Optional knobs for {@link getSortedWallets}. */
+export interface SortOptions {
+  /**
+   * Which wallet should be pinned per the platform-aware rules below.
+   * - `'opindex'` (default): pin Opindex on mobile / desktop-with-extension.
+   * - `string`: pin that wallet id instead, using the same rules.
+   * - `null`: disable pinning entirely (neutral mode for library consumers).
+   */
+  pinnedWalletId?: string | null
+}
 
 /**
  * Order a wallet list for display.
  *
- * 1. Opindex is pinned at index 0 on mobile (always), or on desktop when
- *    `platform.hasOpindexExtension` is true.
+ * 1. If `pinnedWalletId` is non-null (default `'opindex'`), that wallet is
+ *    pinned at index 0 on mobile (always), or on desktop when
+ *    `platform.hasOpindexExtension` is true. Pass `pinnedWalletId: null` to
+ *    disable pinning entirely.
  * 2. The last-used wallet from `localStorage['lastUsedWallet']` comes next
  *    (skipped if it is the same wallet already pinned, or if it is not
  *    present in the input list).
@@ -48,7 +61,9 @@ const OPINDEX_ID = 'opindex'
 export function getSortedWallets(
   wallets: readonly WalletConfig[],
   platform: PlatformInfo,
+  options: SortOptions = {},
 ): WalletConfig[] {
+  const { pinnedWalletId = DEFAULT_PINNED_WALLET_ID } = options
   const remaining = [...wallets]
   const head: WalletConfig[] = []
 
@@ -59,9 +74,8 @@ export function getSortedWallets(
     if (picked) head.push(picked)
   }
 
-  const pinOpindex = platform.isMobile || platform.hasOpindexExtension
-  if (pinOpindex) {
-    take((w) => w.id === OPINDEX_ID)
+  if (pinnedWalletId !== null && (platform.isMobile || platform.hasOpindexExtension)) {
+    take((w) => w.id === pinnedWalletId)
   }
 
   const lastUsedId = getLastUsedWallet()

@@ -126,4 +126,33 @@ describe('getSortedWallets', () => {
 
     expect(ids(result)).toEqual(['phantom', 'solflare', 'backpack'])
   })
+
+  it('pinnedWalletId: null disables pinning entirely (neutral mode)', () => {
+    const result = getSortedWallets([phantom, solflare, opindex, backpack], MOBILE, {
+      pinnedWalletId: null,
+    })
+
+    // No Opindex pin even though we are on mobile.
+    expect(result[0]?.id).toBe('phantom') // lowest priority wins
+    expect(ids(result)).toEqual(['phantom', 'solflare', 'backpack', 'opindex'])
+  })
+
+  it('pinnedWalletId: custom id pins a different wallet on mobile', () => {
+    const result = getSortedWallets([phantom, solflare, opindex, backpack], MOBILE, {
+      pinnedWalletId: 'solflare',
+    })
+
+    expect(ids(result)).toEqual(['solflare', 'phantom', 'backpack', 'opindex'])
+  })
+
+  it('pinnedWalletId: custom id is only pinned when platform rules allow', () => {
+    // Desktop without the corresponding extension — pin is suppressed even
+    // if the wallet is in the list. Same shape as Opindex desktop rule.
+    const result = getSortedWallets([phantom, solflare, opindex, backpack], DESKTOP_NO_EXT, {
+      pinnedWalletId: 'solflare',
+    })
+
+    expect(result[0]?.id).not.toBe('solflare')
+    expect(ids(result)).toEqual(['phantom', 'solflare', 'backpack', 'opindex'])
+  })
 })
