@@ -164,6 +164,25 @@ describe('WalletConnectProvider', () => {
     expect(container.children).toHaveLength(1)
   })
 
+  it('does not call manager.initialize() — that is useWallet()s job', () => {
+    // The Provider is responsible for building and sharing the manager,
+    // NOT for kicking off its lifecycle. `initialize()` is what the
+    // useWallet() / useWalletContext() consumer calls (it resumes any
+    // pending mobile deep-link callback). Pin this so a future change
+    // doesn't accidentally start initialize()-ing inside the Provider
+    // and double-initialize when a useWallet() consumer mounts under it.
+    const fake = makeFakeManager()
+    mocks.createWalletManager.mockReturnValue(fake.manager)
+
+    render(
+      <WalletConnectProvider config={DUMMY_CONFIG}>
+        <div data-testid="bare-child" />
+      </WalletConnectProvider>,
+    )
+
+    expect(fake.manager.initialize).not.toHaveBeenCalled()
+  })
+
   it('destroys the manager on unmount', () => {
     const fake = makeFakeManager()
     mocks.createWalletManager.mockReturnValue(fake.manager)

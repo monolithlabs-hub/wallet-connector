@@ -1,5 +1,4 @@
 export { useWalletContext } from './context/use-wallet-context'
-export { WalletConnectContext } from './context/wallet-connect-context'
 export {
   WalletConnectProvider,
   type WalletConnectProviderProps,
