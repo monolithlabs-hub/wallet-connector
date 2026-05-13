@@ -1,3 +1,10 @@
+// All project-specific types come through one canonical barrel.
+// See `./types` for the curated re-export set (including the
+// `WalletAdapter` union and the `WalletName` branded-string type).
+export type * from './types'
+
+// --- Value exports (functions, classes, enums) ----------------------------
+
 export {
   WalletError,
   WalletNotReadyError,
@@ -24,43 +31,20 @@ export {
   isCallbackUrl,
   parseCallback,
 } from './adapters/callback-handler'
-export type { CallbackResult } from './adapters/callback-handler'
 
 export {
   buildConnectUrl,
   buildSignAndConnectUrl,
   generateEphemeralKeypair,
 } from './adapters/deep-link-builder'
-export type {
-  ConnectOptions,
-  EphemeralKeypair,
-  SignConnectOptions,
-  SolanaCluster,
-} from './adapters/deep-link-builder'
 
 export { createDeepLinkAdapter } from './adapters/deep-link-adapter'
-export type {
-  DeepLinkAdapter,
-  DeepLinkAdapterEvent,
-  DeepLinkAdapterListener,
-  DeepLinkAdapterOptions,
-  DeepLinkAdapterUnsubscribe,
-  DeepLinkConnectInput,
-} from './adapters/deep-link-adapter'
 
 export { createStandardWalletAdapter } from './adapters/standard-wallet-adapter'
-export type {
-  StandardAdapterEvent,
-  StandardAdapterListener,
-  StandardAdapterUnsubscribe,
-  StandardWalletAdapter,
-} from './adapters/standard-wallet-adapter'
 
 export { discoverStandardWallets } from './discovery'
-export type { DiscoveryHandle, DiscoveryListener, DiscoveryUnsubscribe } from './discovery'
 
 export { detectPlatform } from './platform/detector'
-export type { PlatformInfo, PlatformStrategy } from './platform/detector'
 
 export { WalletReadyState } from './ready-state'
 
@@ -72,23 +56,11 @@ export {
   saveLastUsedWallet,
   savePendingState,
 } from './session/store'
-export type { PendingState } from './session/store'
 
 export { createFlowMachine } from './state/machine'
-export type {
-  FlowContext,
-  FlowEvent,
-  FlowMachine,
-  FlowState,
-  SerializedFlow,
-  StateListener,
-  Unsubscribe,
-} from './state/machine'
 
 export { createWalletManager } from './wallet-manager'
-export type { WalletManager, WalletManagerConfig } from './wallet-manager'
 
 export { getSortedWallets } from './wallets/sorter'
-export type { SortOptions, WalletConfig } from './wallets/sorter'
 
-export { asWalletName, type WalletName } from './wallet-name'
+export { asWalletName } from './wallet-name'
