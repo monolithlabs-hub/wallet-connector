@@ -49,6 +49,15 @@ function makeFakeManager(): FakeManager {
     getState: () => machine.getState(),
     getContext: () => machine.getContext(),
     getSortedWallets: () => [],
+    getPlatform: () => ({
+      isMobile: false,
+      isIOS: false,
+      isAndroid: false,
+      hasExtension: false,
+      hasOpindexExtension: false,
+      strategy: 'install-prompt',
+    }),
+    getVersion: () => 0,
     subscribe: (listener) => machine.subscribe(listener),
     destroy: destroySpy,
   }

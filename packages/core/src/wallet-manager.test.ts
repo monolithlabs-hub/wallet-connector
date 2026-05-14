@@ -144,6 +144,34 @@ function makeDiscoveryHandle(adapters: StandardWalletAdapter[]): DiscoveryHandle
   }
 }
 
+/**
+ * Discovery handle with a controllable adapter list. `triggerChange(next)`
+ * swaps the snapshot and invokes every captured `subscribe` listener — the
+ * shape mirrors a real `register` / `unregister` event from the Wallet
+ * Standard registry. Tests use this to verify the manager forwards
+ * registry events through its own `subscribe()` channel.
+ */
+function makeControllableDiscoveryHandle(initial: StandardWalletAdapter[]): DiscoveryHandle & {
+  triggerChange: (next: StandardWalletAdapter[]) => void
+} {
+  let adapters = initial
+  const subscribers = new Set<(adapters: readonly StandardWalletAdapter[]) => void>()
+  return {
+    getAdapters: () => adapters,
+    subscribe: (listener) => {
+      subscribers.add(listener)
+      return () => {
+        subscribers.delete(listener)
+      }
+    },
+    destroy: vi.fn(),
+    triggerChange: (next) => {
+      adapters = next
+      for (const listener of [...subscribers]) listener(adapters)
+    },
+  }
+}
+
 function makeDeepLinkAdapter(overrides: Partial<DeepLinkAdapter> = {}): DeepLinkAdapter {
   return {
     publicKey: null,
@@ -398,6 +426,184 @@ describe('createWalletManager — wallet ordering', () => {
     // No Opindex pin — falls through to priority sort.
     expect(sorted[0]?.id).not.toBe('opindex')
     expect(sorted[0]?.id).toBe('phantom') // lowest priority
+  })
+
+  it('pins Opindex on desktop when registered via Wallet Standard (no window.opindex global)', () => {
+    // The platform detector says hasOpindexExtension=false (no window.opindex
+    // sentinel), but the Wallet Standard registry holds an Opindex adapter.
+    // The augmented platform inside the manager must combine both signals.
+    mocks.detectPlatform.mockReturnValue(DESKTOP_PLATFORM)
+    const opindexAdapter = makeStandardAdapter({ name: 'Opindex' })
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([opindexAdapter]))
+    const manager = createWalletManager({ wallets: [PHANTOM, SOLFLARE, OPINDEX] })
+
+    const sorted = manager.getSortedWallets()
+    const platform = manager.getPlatform()
+
+    expect(sorted[0]?.id).toBe('opindex')
+    expect(platform.hasOpindexExtension).toBe(true)
+  })
+
+  it('does NOT pin Opindex on desktop when registry has no matching wallet', () => {
+    mocks.detectPlatform.mockReturnValue(DESKTOP_PLATFORM)
+    const phantomAdapter = makeStandardAdapter({ name: 'Phantom' })
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([phantomAdapter]))
+    const manager = createWalletManager({ wallets: [PHANTOM, SOLFLARE, OPINDEX] })
+
+    expect(manager.getPlatform().hasOpindexExtension).toBe(false)
+    expect(manager.getSortedWallets()[0]?.id).not.toBe('opindex')
+  })
+
+  it('augmented hasOpindexExtension respects pinnedWallet config', () => {
+    // Pinned wallet is Phantom; a registered Phantom should flip the flag,
+    // and a registered Opindex (without window.opindex) should NOT.
+    mocks.detectPlatform.mockReturnValue(DESKTOP_PLATFORM)
+    const phantomAdapter = makeStandardAdapter({ name: 'Phantom' })
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([phantomAdapter]))
+    const manager = createWalletManager({
+      wallets: [PHANTOM, OPINDEX],
+      pinnedWallet: 'phantom',
+    })
+
+    expect(manager.getPlatform().hasOpindexExtension).toBe(true)
+  })
+
+  it('augmented hasOpindexExtension is false when pinnedWallet is null', () => {
+    mocks.detectPlatform.mockReturnValue(DESKTOP_PLATFORM)
+    const opindexAdapter = makeStandardAdapter({ name: 'Opindex' })
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([opindexAdapter]))
+    const manager = createWalletManager({
+      wallets: [PHANTOM, OPINDEX],
+      pinnedWallet: null,
+    })
+
+    expect(manager.getPlatform().hasOpindexExtension).toBe(false)
+  })
+
+  it('augmented hasOpindexExtension matches by standardName when set', () => {
+    mocks.detectPlatform.mockReturnValue(DESKTOP_PLATFORM)
+    const opindexAdapter = makeStandardAdapter({ name: 'Opindex Wallet' })
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([opindexAdapter]))
+    const manager = createWalletManager({
+      wallets: [
+        PHANTOM,
+        { ...OPINDEX, name: 'Opindex (custom)', standardName: asWalletName('Opindex Wallet') },
+      ],
+    })
+
+    expect(manager.getPlatform().hasOpindexExtension).toBe(true)
+  })
+
+  it('augmented hasOpindexExtension stays true when legacy window.opindex sentinel is set', () => {
+    // Belt-and-suspenders: even if no registered adapter matches, the
+    // legacy detector-set flag still wins.
+    mocks.detectPlatform.mockReturnValue({ ...DESKTOP_PLATFORM, hasOpindexExtension: true })
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([]))
+    const manager = createWalletManager({ wallets: [PHANTOM, OPINDEX] })
+
+    expect(manager.getPlatform().hasOpindexExtension).toBe(true)
+  })
+})
+
+describe('createWalletManager — registry-driven reactivity', () => {
+  beforeEach(() => {
+    mocks.detectPlatform.mockReturnValue(DESKTOP_PLATFORM)
+  })
+
+  it('subscribe() fires when the Wallet Standard registry changes', () => {
+    const handle = makeControllableDiscoveryHandle([])
+    mocks.discoverStandardWallets.mockReturnValue(handle)
+    const manager = createWalletManager({ wallets: [PHANTOM, OPINDEX] })
+
+    const listener = vi.fn()
+    manager.subscribe(listener)
+
+    handle.triggerChange([makeStandardAdapter({ name: 'Opindex' })])
+    expect(listener).toHaveBeenCalled()
+  })
+
+  it('getSortedWallets() re-evaluates after a registry change pins Opindex', () => {
+    const handle = makeControllableDiscoveryHandle([])
+    mocks.discoverStandardWallets.mockReturnValue(handle)
+    const manager = createWalletManager({ wallets: [PHANTOM, OPINDEX] })
+
+    expect(manager.getSortedWallets()[0]?.id).not.toBe('opindex')
+    expect(manager.getPlatform().hasOpindexExtension).toBe(false)
+
+    handle.triggerChange([makeStandardAdapter({ name: 'Opindex' })])
+
+    expect(manager.getSortedWallets()[0]?.id).toBe('opindex')
+    expect(manager.getPlatform().hasOpindexExtension).toBe(true)
+  })
+
+  it('getVersion() increments on every fan-out tick', async () => {
+    const handle = makeControllableDiscoveryHandle([
+      makeStandardAdapter({ name: 'Phantom', connectPublicKey: 'PK' }),
+    ])
+    mocks.discoverStandardWallets.mockReturnValue(handle)
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+
+    const v0 = manager.getVersion()
+
+    // Registry change tick.
+    handle.triggerChange([
+      makeStandardAdapter({ name: 'Phantom', connectPublicKey: 'PK' }),
+      makeStandardAdapter({ name: 'Opindex' }),
+    ])
+    const v1 = manager.getVersion()
+    expect(v1).toBeGreaterThan(v0)
+
+    // FlowMachine ticks (connecting/connected/authenticated) also bump.
+    await manager.connect('phantom')
+    expect(manager.getVersion()).toBeGreaterThan(v1)
+  })
+
+  it('destroy() unsubscribes from the discovery handle', () => {
+    const handle = makeControllableDiscoveryHandle([])
+    mocks.discoverStandardWallets.mockReturnValue(handle)
+    const manager = createWalletManager({ wallets: [PHANTOM, OPINDEX] })
+
+    const listener = vi.fn()
+    manager.subscribe(listener)
+    manager.destroy()
+
+    handle.triggerChange([makeStandardAdapter({ name: 'Opindex' })])
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('subscribe listener exceptions do not stop other listeners', () => {
+    // Match the discovery.ts pattern: queueMicrotask rethrows are stubbed
+    // so the unhandled exception doesn't bubble to vitest.
+    const originalMicrotask = globalThis.queueMicrotask
+    const captured: unknown[] = []
+    globalThis.queueMicrotask = (fn) => {
+      try {
+        fn()
+      } catch (err) {
+        captured.push(err)
+      }
+    }
+    try {
+      const handle = makeControllableDiscoveryHandle([])
+      mocks.discoverStandardWallets.mockReturnValue(handle)
+      const manager = createWalletManager({ wallets: [PHANTOM, OPINDEX] })
+
+      const failing = vi.fn(() => {
+        throw new Error('boom')
+      })
+      const ok = vi.fn()
+      manager.subscribe(failing)
+      manager.subscribe(ok)
+
+      handle.triggerChange([makeStandardAdapter({ name: 'Opindex' })])
+
+      expect(failing).toHaveBeenCalled()
+      expect(ok).toHaveBeenCalled()
+      expect(captured).toHaveLength(1)
+      expect((captured[0] as Error).message).toBe('boom')
+    } finally {
+      globalThis.queueMicrotask = originalMicrotask
+    }
   })
 })
 

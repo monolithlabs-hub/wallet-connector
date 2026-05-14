@@ -28,7 +28,15 @@ export interface PlatformInfo {
   isAndroid: boolean
   /** Any wallet has injected itself as `window.solana`. */
   hasExtension: boolean
-  /** The Opindex extension is present (`window.opindex.isOpindex === true`). */
+  /**
+   * The Opindex (or whichever wallet `pinnedWallet` resolves to) extension
+   * is present. `detectPlatform()` only checks the legacy
+   * `window.opindex.isOpindex` sentinel. When read via
+   * `WalletManager.getPlatform()` the value is augmented: it is also
+   * `true` when the pinned wallet is registered via the Wallet Standard
+   * registry, since modern Wallet-Standard-only extensions (including the
+   * real Opindex) don't inject any `window.*` global.
+   */
   hasOpindexExtension: boolean
   /** Derived connection strategy; see {@link PlatformStrategy}. */
   strategy: PlatformStrategy

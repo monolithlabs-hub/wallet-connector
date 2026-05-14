@@ -1,10 +1,5 @@
 <script setup lang="ts">
-import {
-  detectPlatform,
-  type FlowState,
-  type PlatformInfo,
-  type WalletConfig,
-} from '@monolithlabs/wallet-connect-core'
+import { type FlowState, type WalletConfig } from '@monolithlabs/wallet-connect-core'
 import {
   attachModal,
   getDialogAttributes,
@@ -88,6 +83,7 @@ const {
   signature,
   wallet: activeWallet,
   sortedWallets,
+  platform,
   error,
   disconnecting,
   connect,
@@ -95,9 +91,6 @@ const {
 } = useWallet()
 
 const open = ref(false)
-// Platform is read once per mount and cached. `detectPlatform()` reads
-// `navigator`; it's SSR-safe (returns `install-prompt` on the server).
-const platform = ref<PlatformInfo>(detectPlatform())
 const titleId = useId()
 const dialogRef = useTemplateRef<HTMLDivElement>('dialog')
 

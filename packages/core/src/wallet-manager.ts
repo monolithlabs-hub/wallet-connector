@@ -128,6 +128,22 @@ export interface WalletManager {
   signIn(input?: SolanaSignInInput): Promise<SolanaSignInOutput>
   getState(): FlowState
   getContext(): FlowContext
+  /**
+   * Platform snapshot, augmented with Wallet Standard registry state. The
+   * `hasOpindexExtension` flag is `true` if EITHER the legacy
+   * `window.opindex` sentinel is set OR the configured `pinnedWallet`
+   * is registered via Wallet Standard. Re-read on every notification —
+   * the manager re-emits when the registry changes.
+   */
+  getPlatform(): PlatformInfo
+  /**
+   * Monotonic counter that increments on every event the manager fans out
+   * to subscribers (FlowMachine state change OR Wallet Standard registry
+   * change). Use as the snapshot value for React's
+   * `useSyncExternalStore` so registry-only updates trigger a re-render
+   * even when the FlowState string is unchanged.
+   */
+  getVersion(): number
   subscribe(listener: StateListener): Unsubscribe
   /** Detach from the wallet-standard registry and tear down adapters. Idempotent. */
   destroy(): void
@@ -153,23 +169,73 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
   const platform = detectPlatform()
 
   const machine = createFlowMachine()
-  // Bridge machine state → consumer's onStateChange callback. Listener
-  // exceptions are already isolated by the FlowMachine's queueMicrotask
-  // rethrow (TASK-104 hardening). Capture the unsubscribe so `destroy()`
-  // can detach cleanly (tidiness — the FlowMachine is GC'd with the
-  // manager so it's not a real leak, but explicit cleanup is good form).
+
+  // Manager-level subscribers fan-out. FlowMachine state changes AND
+  // Wallet Standard registry changes are both routed through this set so
+  // consumers (React's `useSyncExternalStore`, Vue's `watch`) re-render on
+  // either signal. Listener exceptions are isolated via the
+  // `queueMicrotask` rethrow pattern used by the FlowMachine (TASK-104)
+  // and discovery (TASK-107).
+  const listeners = new Set<StateListener>()
+  let version = 0
+  function notify(): void {
+    version += 1
+    const state = machine.getState()
+    for (const listener of [...listeners]) {
+      try {
+        listener(state)
+      } catch (err) {
+        queueMicrotask(() => {
+          throw err
+        })
+      }
+    }
+  }
+
+  // Bridge machine state → consumer's onStateChange callback AND the
+  // manager fan-out. Capture the unsubscribe so `destroy()` can detach
+  // cleanly.
   const unsubscribeStateChange = machine.subscribe((state) => {
     config.onStateChange?.(state)
+    notify()
   })
 
   // Lazy adapter holders — populated based on the platform strategy.
   let discoveryHandle: DiscoveryHandle | null = null
   let deepLinkAdapter: DeepLinkAdapter | null = null
+  let unsubscribeDiscovery: (() => void) | null = null
 
   if (platform.strategy === 'extension') {
     discoveryHandle = discoverStandardWallets()
+    // Registry changes invalidate the augmented platform cache and
+    // re-notify subscribers so the sorted list + install badge reflect a
+    // late-registering Opindex.
+    unsubscribeDiscovery = discoveryHandle.subscribe(() => {
+      augmentedPlatformCache = null
+      notify()
+    })
   } else if (platform.strategy === 'deeplink') {
     deepLinkAdapter = createDeepLinkAdapterForConfig(config, platform, cluster)
+  }
+
+  // Cache of the augmented platform. Invalidated on every registry
+  // change; recomputed lazily when {@link getPlatform} or
+  // {@link getSortedWallets} is called.
+  let augmentedPlatformCache: PlatformInfo | null = null
+  function getAugmentedPlatform(): PlatformInfo {
+    if (augmentedPlatformCache) return augmentedPlatformCache
+    let hasOpindexExtension = platform.hasOpindexExtension
+    if (!hasOpindexExtension && pinnedWallet && discoveryHandle) {
+      const pinnedConfig = config.wallets.find((w) => w.id === pinnedWallet)
+      if (pinnedConfig) {
+        const adapters = discoveryHandle.getAdapters()
+        if (adapters.some((a) => walletConfigMatchesName(pinnedConfig, a.wallet.name))) {
+          hasOpindexExtension = true
+        }
+      }
+    }
+    augmentedPlatformCache = { ...platform, hasOpindexExtension }
+    return augmentedPlatformCache
   }
 
   let destroyed = false
@@ -442,25 +508,42 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
   return {
     initialize,
     getSortedWallets: () =>
-      getSortedWallets(config.wallets, platform, { pinnedWalletId: pinnedWallet }),
+      getSortedWallets(config.wallets, getAugmentedPlatform(), { pinnedWalletId: pinnedWallet }),
     connect,
     disconnect,
     signMessage,
     signIn,
     getState: () => machine.getState(),
     getContext: () => machine.getContext(),
+    getPlatform: () => getAugmentedPlatform(),
+    getVersion: () => version,
     subscribe: (listener) => {
       assertAlive()
-      return machine.subscribe(listener)
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
     },
     destroy: () => {
       if (destroyed) return
       destroyed = true
       unsubscribeStateChange()
+      if (unsubscribeDiscovery) unsubscribeDiscovery()
+      listeners.clear()
       if (discoveryHandle) discoveryHandle.destroy()
       if (deepLinkAdapter) deepLinkAdapter.destroy()
     },
   }
+}
+
+/**
+ * True if a registered Wallet Standard wallet name matches the given
+ * {@link WalletConfig}. Prefers `standardName` (exact match); falls back
+ * to case-insensitive `name`. Pure / safe to call with any string.
+ */
+function walletConfigMatchesName(walletConfig: WalletConfig, name: string): boolean {
+  if (walletConfig.standardName && walletConfig.standardName === name) return true
+  return walletConfig.name.toLowerCase() === name.toLowerCase()
 }
 
 function createDeepLinkAdapterForConfig(

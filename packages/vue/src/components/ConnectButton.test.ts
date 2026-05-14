@@ -6,28 +6,12 @@ import {
   type WalletManager,
 } from '@monolithlabs/wallet-connect-core'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 
 import { WalletConnectInjectionKey } from '../context/injection-key'
 
 import ConnectButton from './ConnectButton.vue'
-
-// --- Module mock: control detectPlatform per-test ------------------------
-
-const mocks = vi.hoisted(() => ({
-  detectPlatform: vi.fn<() => PlatformInfo>(),
-}))
-
-vi.mock('@monolithlabs/wallet-connect-core', async () => {
-  const actual = await vi.importActual<typeof import('@monolithlabs/wallet-connect-core')>(
-    '@monolithlabs/wallet-connect-core',
-  )
-  return {
-    ...actual,
-    detectPlatform: mocks.detectPlatform,
-  }
-})
 
 // --- Fixtures ------------------------------------------------------------
 
@@ -98,11 +82,15 @@ interface MockManager {
   machine: FlowMachine
   connectSpy: ReturnType<typeof vi.fn>
   disconnectSpy: ReturnType<typeof vi.fn>
+  setPlatform: (next: PlatformInfo) => void
+  /** Force a registry-style notification without changing FlowState. */
+  notifyRegistryChange: () => void
 }
 
 function makeMockManager(opts: {
   wallets: WalletConfig[]
   sortedWallets?: WalletConfig[]
+  platform?: PlatformInfo
 }): MockManager {
   const machine = createFlowMachine()
   const connectSpy = vi.fn(async (walletId: string) => {
@@ -111,6 +99,17 @@ function makeMockManager(opts: {
   const disconnectSpy = vi.fn(async () => {
     machine.send({ type: 'RESET' })
   })
+
+  let platform: PlatformInfo = opts.platform ?? DESKTOP_NO_EXTENSION
+  let version = 0
+  const listeners = new Set<(state: ReturnType<FlowMachine['getState']>) => void>()
+  function notify() {
+    version += 1
+    const state = machine.getState()
+    for (const listener of [...listeners]) listener(state)
+  }
+  machine.subscribe(() => notify())
+
   const manager: WalletManager = {
     initialize: vi.fn(),
     connect: connectSpy,
@@ -120,10 +119,26 @@ function makeMockManager(opts: {
     getState: () => machine.getState(),
     getContext: () => machine.getContext(),
     getSortedWallets: () => opts.sortedWallets ?? opts.wallets,
-    subscribe: (listener) => machine.subscribe(listener),
+    getPlatform: () => platform,
+    getVersion: () => version,
+    subscribe: (listener) => {
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
+    },
     destroy: vi.fn(),
   }
-  return { manager, machine, connectSpy, disconnectSpy }
+  return {
+    manager,
+    machine,
+    connectSpy,
+    disconnectSpy,
+    setPlatform: (next) => {
+      platform = next
+    },
+    notifyRegistryChange: () => notify(),
+  }
 }
 
 function mountButton(manager: WalletManager, props: Record<string, unknown> = {}): VueWrapper {
@@ -148,12 +163,9 @@ function getWalletButtons(): HTMLButtonElement[] {
   return Array.from(document.body.querySelectorAll<HTMLButtonElement>('[data-wallet-id]'))
 }
 
-beforeEach(() => {
-  mocks.detectPlatform.mockReturnValue(DESKTOP_NO_EXTENSION)
-  // The shared setup file's `enableAutoUnmount(afterEach)` clears the
-  // mounted components; but Teleported nodes get torn down with the
-  // component, so no manual document.body cleanup is needed.
-})
+// The shared setup file's `enableAutoUnmount(afterEach)` clears the
+// mounted components; Teleported nodes get torn down with the component,
+// so no manual document.body cleanup is needed.
 
 // --- Tests --------------------------------------------------------------
 
@@ -203,10 +215,10 @@ describe('ConnectButton.vue', () => {
   })
 
   it('wallet list shows Opindex first on mobile', async () => {
-    mocks.detectPlatform.mockReturnValue(MOBILE_PLATFORM)
     const mock = makeMockManager({
       wallets: [PHANTOM, SOLFLARE, OPINDEX],
       sortedWallets: [OPINDEX, PHANTOM, SOLFLARE],
+      platform: MOBILE_PLATFORM,
     })
     const wrapper = mountButton(mock.manager)
 
@@ -217,10 +229,10 @@ describe('ConnectButton.vue', () => {
   })
 
   it('Opindex shows the "Get" badge on mobile', async () => {
-    mocks.detectPlatform.mockReturnValue(MOBILE_PLATFORM)
     const mock = makeMockManager({
       wallets: [OPINDEX, PHANTOM],
       sortedWallets: [OPINDEX, PHANTOM],
+      platform: MOBILE_PLATFORM,
     })
     const wrapper = mountButton(mock.manager)
 
@@ -234,10 +246,10 @@ describe('ConnectButton.vue', () => {
   })
 
   it('Opindex shows the "Install" badge on desktop without the extension', async () => {
-    mocks.detectPlatform.mockReturnValue(DESKTOP_NO_EXTENSION)
     const mock = makeMockManager({
       wallets: [OPINDEX, PHANTOM],
       sortedWallets: [OPINDEX, PHANTOM],
+      platform: DESKTOP_NO_EXTENSION,
     })
     const wrapper = mountButton(mock.manager)
 
@@ -247,11 +259,35 @@ describe('ConnectButton.vue', () => {
     expect(opindex?.textContent).toContain('Install')
   })
 
-  it('Opindex shows no badge on desktop when the extension is detected', async () => {
-    mocks.detectPlatform.mockReturnValue(DESKTOP_WITH_OPINDEX)
+  it('Opindex badge updates when the registry registers it late', async () => {
+    // Late-registering Opindex (real-extension path): the manager fires
+    // a registry notification, the composable's subscribe callback
+    // updates the platform ref, and the badge disappears.
     const mock = makeMockManager({
       wallets: [OPINDEX, PHANTOM],
       sortedWallets: [OPINDEX, PHANTOM],
+      platform: DESKTOP_NO_EXTENSION,
+    })
+    const wrapper = mountButton(mock.manager)
+
+    await wrapper.get('button').trigger('click')
+
+    let opindex = document.body.querySelector('[data-wallet-id="opindex"]')
+    expect(opindex?.textContent).toContain('Install')
+
+    mock.setPlatform(DESKTOP_WITH_OPINDEX)
+    mock.notifyRegistryChange()
+    await nextTick()
+
+    opindex = document.body.querySelector('[data-wallet-id="opindex"]')
+    expect(opindex?.textContent).not.toContain('Install')
+  })
+
+  it('Opindex shows no badge on desktop when the extension is detected', async () => {
+    const mock = makeMockManager({
+      wallets: [OPINDEX, PHANTOM],
+      sortedWallets: [OPINDEX, PHANTOM],
+      platform: DESKTOP_WITH_OPINDEX,
     })
     const wrapper = mountButton(mock.manager)
 

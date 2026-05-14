@@ -2,6 +2,7 @@ import {
   WalletConnectionError,
   type FlowContext,
   type FlowState,
+  type PlatformInfo,
   type SolanaSignInInput,
   type SolanaSignInOutput,
   type WalletConfig,
@@ -37,6 +38,12 @@ export interface UseWalletReturn {
   wallet: ComputedRef<WalletConfig | null>
   /** Display-ready wallet list per the platform + pinnedWallet rules. */
   sortedWallets: ComputedRef<WalletConfig[]>
+  /**
+   * Platform snapshot from the manager. `hasOpindexExtension` reflects
+   * BOTH the legacy `window.opindex` sentinel AND the Wallet Standard
+   * registry — see `WalletManager.getPlatform()`.
+   */
+  platform: ComputedRef<PlatformInfo>
   /** Last error seen in the flow, or `null`. Cleared on RESET. */
   error: ComputedRef<WalletError | null>
 
@@ -92,6 +99,7 @@ export function useWallet(): UseWalletReturn {
   const state = ref<FlowState>(manager.getState())
   const context = shallowRef<FlowContext>(manager.getContext())
   const sortedWalletsRef = shallowRef<WalletConfig[]>(manager.getSortedWallets())
+  const platformRef = shallowRef<PlatformInfo>(manager.getPlatform())
 
   // wallet-adapter compat: track the user-selected wallet (pre-connect)
   // separately from the in-flight / connected one. A plain `ref` is
@@ -110,6 +118,7 @@ export function useWallet(): UseWalletReturn {
       state.value = manager.getState()
       context.value = manager.getContext()
       sortedWalletsRef.value = manager.getSortedWallets()
+      platformRef.value = manager.getPlatform()
     })
   }
 
@@ -129,6 +138,7 @@ export function useWallet(): UseWalletReturn {
   // ---- Derived (computed) ----------------------------------------------
 
   const sortedWallets = computed<WalletConfig[]>(() => sortedWalletsRef.value)
+  const platform = computed<PlatformInfo>(() => platformRef.value)
 
   const publicKey = computed<string | null>(() => context.value.publicKey)
   const signature = computed<string | null>(() => context.value.signature)
@@ -183,6 +193,7 @@ export function useWallet(): UseWalletReturn {
     signature,
     wallet,
     sortedWallets,
+    platform,
     error,
     connecting: isConnecting,
     connected: isConnected,

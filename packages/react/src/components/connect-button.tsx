@@ -1,5 +1,4 @@
 import {
-  detectPlatform,
   type FlowState,
   type PlatformInfo,
   type WalletConfig,
@@ -93,8 +92,10 @@ export function ConnectButton({
 }: ConnectButtonProps): ReactNode {
   const wallet = useWallet()
   const [open, setOpen] = useState(false)
-  // Lazy init so detectPlatform (which reads navigator) runs once per mount.
-  const [platform] = useState<PlatformInfo>(() => detectPlatform())
+  // Platform comes from the manager — it reflects BOTH the legacy
+  // `window.opindex` sentinel AND the Wallet Standard registry so
+  // late-registering Opindex flips `hasOpindexExtension` automatically.
+  const platform = wallet.platform
 
   const titleId = useId()
 

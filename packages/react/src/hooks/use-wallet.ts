@@ -2,6 +2,7 @@ import {
   createWalletManager,
   WalletConnectionError,
   type FlowState,
+  type PlatformInfo,
   type SolanaSignInInput,
   type SolanaSignInOutput,
   type WalletConfig,
@@ -49,6 +50,12 @@ export interface UseWalletReturn {
   // --- project-specific additions ----------------------------------------
   state: FlowState
   sortedWallets: WalletConfig[]
+  /**
+   * Platform snapshot from the manager. `hasOpindexExtension` reflects
+   * BOTH the legacy `window.opindex` sentinel AND the Wallet Standard
+   * registry — see `WalletManager.getPlatform()`.
+   */
+  platform: PlatformInfo
   isConnecting: boolean
   isConnected: boolean
   isSigning: boolean
@@ -122,16 +129,21 @@ export function useWallet(config?: WalletManagerConfig): UseWalletReturn {
     (onStoreChange: () => void) => manager.subscribe(onStoreChange),
     [manager],
   )
-  const getSnapshot = useCallback(() => manager.getState(), [manager])
-  // SSR fallback: pre-hydration the manager has no state to report; report
-  // 'idle' so server-rendered output is deterministic.
-  const state = useSyncExternalStore<FlowState>(subscribe, getSnapshot, () => 'idle')
+  // Snapshot is the manager's monotonic version counter — bumps on
+  // FlowMachine state changes AND Wallet Standard registry events. Using
+  // it (vs `getState()`, which returns a string) ensures a registry-only
+  // update (e.g., Opindex registering late) still triggers a re-render so
+  // `sortedWallets` and `platform` reflect the new registry.
+  const getSnapshot = useCallback(() => manager.getVersion(), [manager])
+  // SSR fallback: pre-hydration the manager has no version yet; report 0.
+  useSyncExternalStore<number>(subscribe, getSnapshot, () => 0)
 
-  // Read context on every render. It changes in lockstep with state
-  // transitions (every context mutation is followed by `notify()` in the
-  // FlowMachine), so re-rendering on state change is sufficient to keep
-  // publicKey / error / signature in sync.
+  // Read state, context, and platform on every render. The store's
+  // snapshot (the version counter) drives re-renders; the actual values
+  // come from the manager directly so they're always fresh.
+  const state = manager.getState()
   const context = manager.getContext()
+  const platform = manager.getPlatform()
 
   // wallet-adapter compat: track the user-selected wallet (pre-connect)
   // separately from the in-flight / connected one. Once a connect resolves
@@ -216,6 +228,7 @@ export function useWallet(config?: WalletManagerConfig): UseWalletReturn {
     signIn,
     state,
     sortedWallets,
+    platform,
     isConnecting: state === 'connecting',
     isConnected: connected,
     isSigning: state === 'signing',
