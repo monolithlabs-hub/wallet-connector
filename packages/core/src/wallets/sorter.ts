@@ -2,6 +2,8 @@ import type { PlatformInfo } from '../platform/detector'
 import { getLastUsedWallet } from '../session/store'
 import type { WalletName } from '../wallet-name'
 
+import type { WalletListEntry } from './list-entry'
+
 /**
  * Display metadata for a single wallet shown in the connect UI. The library
  * treats `id === 'opindex'` as the pin target on mobile and on
@@ -55,19 +57,23 @@ export interface SortOptions {
  * 3. Remaining wallets are sorted ascending by `priority`. `Array.prototype.sort`
  *    is stable per ES2019+, so equal priorities preserve input order.
  *
+ * Auto-discovered wallets (entries with `source: 'discovered'` produced by
+ * {@link mergeWalletList}) carry `priority: Number.MAX_SAFE_INTEGER`, so
+ * they naturally sort after every configured wallet in step 3.
+ *
  * Pure — never mutates the input array. SSR-safe — falls back to no
  * last-used wallet when `localStorage` is unavailable or throws.
  */
 export function getSortedWallets(
-  wallets: readonly WalletConfig[],
+  wallets: readonly WalletListEntry[],
   platform: PlatformInfo,
   options: SortOptions = {},
-): WalletConfig[] {
+): WalletListEntry[] {
   const { pinnedWalletId = DEFAULT_PINNED_WALLET_ID } = options
   const remaining = [...wallets]
-  const head: WalletConfig[] = []
+  const head: WalletListEntry[] = []
 
-  const take = (predicate: (w: WalletConfig) => boolean): void => {
+  const take = (predicate: (w: WalletListEntry) => boolean): void => {
     const idx = remaining.findIndex(predicate)
     if (idx === -1) return
     const [picked] = remaining.splice(idx, 1)

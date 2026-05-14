@@ -2,7 +2,8 @@ import {
   createFlowMachine,
   WalletConnectionError,
   type FlowMachine,
-  type WalletConfig,
+  type PlatformInfo,
+  type WalletListEntry,
   type WalletManager,
 } from '@monolithlabs/wallet-connect-core'
 import { act, renderHook } from '@testing-library/react'
@@ -13,26 +14,39 @@ import { WalletConnectContext } from '../context/wallet-connect-context'
 
 import { useWallet } from './use-wallet'
 
-const PHANTOM: WalletConfig = {
+const PHANTOM: WalletListEntry = {
   id: 'phantom',
   name: 'Phantom',
   priority: 1,
   icon: '',
+  isDetected: false,
+  source: 'configured',
   deepLinkScheme: 'phantom://',
   universalLink: 'https://phantom.app/ul/v1/connect',
   appStoreUrl: '',
   playStoreUrl: '',
 }
 
-const SOLFLARE: WalletConfig = {
+const SOLFLARE: WalletListEntry = {
   id: 'solflare',
   name: 'Solflare',
   priority: 2,
   icon: '',
+  isDetected: false,
+  source: 'configured',
   deepLinkScheme: 'solflare://',
   universalLink: 'https://solflare.com/ul/v1/connect',
   appStoreUrl: '',
   playStoreUrl: '',
+}
+
+const DEFAULT_PLATFORM: PlatformInfo = {
+  isMobile: false,
+  isIOS: false,
+  isAndroid: false,
+  hasExtension: true,
+  hasOpindexExtension: false,
+  strategy: 'extension',
 }
 
 interface MockManager {
@@ -44,9 +58,13 @@ interface MockManager {
   signMessageSpy: ReturnType<typeof vi.fn>
   signInSpy: ReturnType<typeof vi.fn>
   unsubscribeSpy: ReturnType<typeof vi.fn>
+  /** Mutate to simulate a platform change; call `notify()` to publish. */
+  setPlatform(next: PlatformInfo): void
+  /** Force a registry-style notification without changing FlowState. */
+  notifyRegistryChange(): void
 }
 
-function makeMockManager(wallets: WalletConfig[] = [PHANTOM, SOLFLARE]): MockManager {
+function makeMockManager(wallets: WalletListEntry[] = [PHANTOM, SOLFLARE]): MockManager {
   const machine = createFlowMachine()
   const initializeSpy = vi.fn()
   const connectSpy = vi.fn(async () => undefined)
@@ -54,6 +72,18 @@ function makeMockManager(wallets: WalletConfig[] = [PHANTOM, SOLFLARE]): MockMan
   const signMessageSpy = vi.fn(async () => new Uint8Array([1, 2, 3]))
   const signInSpy = vi.fn()
   const unsubscribeSpy = vi.fn()
+
+  let platform: PlatformInfo = DEFAULT_PLATFORM
+  let version = 0
+  const listeners = new Set<(state: ReturnType<FlowMachine['getState']>) => void>()
+  function notify() {
+    version += 1
+    const state = machine.getState()
+    for (const listener of [...listeners]) listener(state)
+  }
+  // Fan FlowMachine state changes into the manager's listener set —
+  // mirrors the real manager's behavior.
+  machine.subscribe(() => notify())
 
   const manager: WalletManager = {
     initialize: initializeSpy,
@@ -64,11 +94,13 @@ function makeMockManager(wallets: WalletConfig[] = [PHANTOM, SOLFLARE]): MockMan
     getState: () => machine.getState(),
     getContext: () => machine.getContext(),
     getSortedWallets: () => wallets,
+    getPlatform: () => platform,
+    getVersion: () => version,
     subscribe: (listener) => {
-      const real = machine.subscribe(listener)
+      listeners.add(listener)
       return () => {
         unsubscribeSpy()
-        real()
+        listeners.delete(listener)
       }
     },
     destroy: vi.fn(),
@@ -83,6 +115,10 @@ function makeMockManager(wallets: WalletConfig[] = [PHANTOM, SOLFLARE]): MockMan
     signMessageSpy,
     signInSpy,
     unsubscribeSpy,
+    setPlatform: (next) => {
+      platform = next
+    },
+    notifyRegistryChange: () => notify(),
   }
 }
 
@@ -449,5 +485,30 @@ describe('useWallet', () => {
     })
 
     expect(mock.signInSpy).toHaveBeenCalledWith({ domain: 'example.com' })
+  })
+
+  it('exposes platform from the manager', () => {
+    const mock = makeMockManager()
+    mock.setPlatform({ ...DEFAULT_PLATFORM, hasOpindexExtension: true })
+    const { result } = renderHook(() => useWallet(), { wrapper: makeWrapper(mock.manager) })
+
+    expect(result.current.platform.hasOpindexExtension).toBe(true)
+  })
+
+  it('re-renders when the manager fires a registry-only notification', () => {
+    // A Wallet Standard `register` event bumps the manager's version
+    // without changing FlowState. The hook still has to re-render so
+    // `platform` and `sortedWallets` reflect the new registry.
+    const mock = makeMockManager()
+    const { result } = renderHook(() => useWallet(), { wrapper: makeWrapper(mock.manager) })
+
+    expect(result.current.platform.hasOpindexExtension).toBe(false)
+
+    act(() => {
+      mock.setPlatform({ ...DEFAULT_PLATFORM, hasOpindexExtension: true })
+      mock.notifyRegistryChange()
+    })
+
+    expect(result.current.platform.hasOpindexExtension).toBe(true)
   })
 })

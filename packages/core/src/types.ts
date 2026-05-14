@@ -91,6 +91,8 @@ export type {
 
 export type { SortOptions, WalletConfig } from './wallets/sorter'
 
+export type { WalletListEntry } from './wallets/list-entry'
+
 export type { WalletManager, WalletManagerConfig } from './wallet-manager'
 
 // --- Ported types (pure type aliases — see file header note) -------------

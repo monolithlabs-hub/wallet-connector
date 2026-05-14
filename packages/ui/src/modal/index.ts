@@ -7,3 +7,4 @@ export {
   type FocusTrapOptions,
 } from './focus-trap'
 export { lockBodyScroll } from './scroll-lock'
+export { injectModalStyles, MODAL_CSS_VARS, type ModalCssVar } from './styles'

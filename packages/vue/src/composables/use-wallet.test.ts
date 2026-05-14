@@ -2,7 +2,8 @@ import {
   createFlowMachine,
   WalletConnectionError,
   type FlowMachine,
-  type WalletConfig,
+  type PlatformInfo,
+  type WalletListEntry,
   type WalletManager,
 } from '@monolithlabs/wallet-connect-core'
 import { mount } from '@vue/test-utils'
@@ -16,22 +17,26 @@ import { useWallet, type UseWalletReturn } from './use-wallet'
 
 // --- Fixtures ------------------------------------------------------------
 
-const PHANTOM: WalletConfig = {
+const PHANTOM: WalletListEntry = {
   id: 'phantom',
   name: 'Phantom',
   priority: 1,
   icon: '',
+  isDetected: false,
+  source: 'configured',
   deepLinkScheme: 'phantom://',
   universalLink: 'https://phantom.app/ul/v1/connect',
   appStoreUrl: '',
   playStoreUrl: '',
 }
 
-const SOLFLARE: WalletConfig = {
+const SOLFLARE: WalletListEntry = {
   id: 'solflare',
   name: 'Solflare',
   priority: 2,
   icon: '',
+  isDetected: false,
+  source: 'configured',
   deepLinkScheme: 'solflare://',
   universalLink: 'https://solflare.com/ul/v1/connect',
   appStoreUrl: '',
@@ -39,6 +44,15 @@ const SOLFLARE: WalletConfig = {
 }
 
 // --- Mock manager --------------------------------------------------------
+
+const DEFAULT_PLATFORM: PlatformInfo = {
+  isMobile: false,
+  isIOS: false,
+  isAndroid: false,
+  hasExtension: true,
+  hasOpindexExtension: false,
+  strategy: 'extension',
+}
 
 interface MockManager {
   manager: WalletManager
@@ -49,9 +63,11 @@ interface MockManager {
   signMessageSpy: ReturnType<typeof vi.fn>
   signInSpy: ReturnType<typeof vi.fn>
   unsubscribeSpy: ReturnType<typeof vi.fn>
+  setPlatform: (next: PlatformInfo) => void
+  notifyRegistryChange: () => void
 }
 
-function makeMockManager(wallets: WalletConfig[] = [PHANTOM, SOLFLARE]): MockManager {
+function makeMockManager(wallets: WalletListEntry[] = [PHANTOM, SOLFLARE]): MockManager {
   const machine = createFlowMachine()
   const initializeSpy = vi.fn()
   const connectSpy = vi.fn(async (walletId: string) => {
@@ -64,6 +80,16 @@ function makeMockManager(wallets: WalletConfig[] = [PHANTOM, SOLFLARE]): MockMan
   const signInSpy = vi.fn()
   const unsubscribeSpy = vi.fn()
 
+  let platform: PlatformInfo = DEFAULT_PLATFORM
+  let version = 0
+  const listeners = new Set<(state: ReturnType<FlowMachine['getState']>) => void>()
+  function notify() {
+    version += 1
+    const state = machine.getState()
+    for (const listener of [...listeners]) listener(state)
+  }
+  machine.subscribe(() => notify())
+
   const manager: WalletManager = {
     initialize: initializeSpy,
     connect: connectSpy,
@@ -73,11 +99,13 @@ function makeMockManager(wallets: WalletConfig[] = [PHANTOM, SOLFLARE]): MockMan
     getState: () => machine.getState(),
     getContext: () => machine.getContext(),
     getSortedWallets: () => wallets,
+    getPlatform: () => platform,
+    getVersion: () => version,
     subscribe: (listener) => {
-      const real = machine.subscribe(listener)
+      listeners.add(listener)
       return () => {
         unsubscribeSpy()
-        real()
+        listeners.delete(listener)
       }
     },
     destroy: vi.fn(),
@@ -92,6 +120,10 @@ function makeMockManager(wallets: WalletConfig[] = [PHANTOM, SOLFLARE]): MockMan
     signMessageSpy,
     signInSpy,
     unsubscribeSpy,
+    setPlatform: (next) => {
+      platform = next
+    },
+    notifyRegistryChange: () => notify(),
   }
 }
 
@@ -309,6 +341,27 @@ describe('useWallet (Vue composable)', () => {
 
     await wallet.signIn({ domain: 'example.com' })
     expect(mock.signInSpy).toHaveBeenCalledWith({ domain: 'example.com' })
+  })
+
+  it('exposes platform from the manager', () => {
+    const mock = makeMockManager()
+    mock.setPlatform({ ...DEFAULT_PLATFORM, hasOpindexExtension: true })
+    const { wallet } = mountWithManager(mock.manager)
+
+    expect(wallet.platform.value.hasOpindexExtension).toBe(true)
+  })
+
+  it('platform updates when the manager fires a registry-only notification', async () => {
+    const mock = makeMockManager()
+    const { wallet } = mountWithManager(mock.manager)
+
+    expect(wallet.platform.value.hasOpindexExtension).toBe(false)
+
+    mock.setPlatform({ ...DEFAULT_PLATFORM, hasOpindexExtension: true })
+    mock.notifyRegistryChange()
+    await nextTick()
+
+    expect(wallet.platform.value.hasOpindexExtension).toBe(true)
   })
 
   it('throws when useWalletContext is called outside of setup()', () => {

@@ -13,6 +13,12 @@ dist
 .turbo
 coverage
 
+# Playwright artifacts
+test-results
+playwright-report
+/blob-report
+/playwright/.cache
+
 # Copied into packages/core/ by its `prepack` script; removed by `postpack`.
 # Source-of-truth lives at the repo root.
 packages/core/NOTICE

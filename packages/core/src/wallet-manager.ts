@@ -20,6 +20,8 @@ import {
   type StateListener,
   type Unsubscribe,
 } from './state/machine'
+import { asWalletName } from './wallet-name'
+import { mergeWalletList, walletNameSlug, type WalletListEntry } from './wallets/list-entry'
 import { getSortedWallets, type WalletConfig } from './wallets/sorter'
 
 /**
@@ -97,8 +99,22 @@ export interface WalletManager {
    * Throws after {@link destroy}.
    */
   initialize(): void
-  /** Display-ready wallet list per the platform + pinnedWallet rules. */
-  getSortedWallets(): WalletConfig[]
+  /**
+   * Display-ready wallet list per the platform + pinnedWallet rules.
+   *
+   * Each entry carries the consumer's {@link WalletConfig} metadata plus
+   * runtime fields derived from the Wallet Standard registry: `isDetected`
+   * (drives the "Detected" badge), `source` (`'configured'` vs.
+   * `'discovered'`), and a fallback `icon` data URI from the registered
+   * wallet when the consumer didn't supply one.
+   *
+   * Wallets installed via Wallet Standard but NOT in
+   * {@link WalletManagerConfig.wallets} appear as `source: 'discovered'`
+   * entries at the end of the list — call `connect(entry.id)` on them
+   * exactly like configured wallets; the manager resolves the adapter
+   * from the registry.
+   */
+  getSortedWallets(): WalletListEntry[]
   /**
    * Initiate connect for a wallet from the config list. Auto-resets the
    * FlowMachine when called from any non-idle state, so retries after a
@@ -128,6 +144,22 @@ export interface WalletManager {
   signIn(input?: SolanaSignInInput): Promise<SolanaSignInOutput>
   getState(): FlowState
   getContext(): FlowContext
+  /**
+   * Platform snapshot, augmented with Wallet Standard registry state. The
+   * `hasOpindexExtension` flag is `true` if EITHER the legacy
+   * `window.opindex` sentinel is set OR the configured `pinnedWallet`
+   * is registered via Wallet Standard. Re-read on every notification —
+   * the manager re-emits when the registry changes.
+   */
+  getPlatform(): PlatformInfo
+  /**
+   * Monotonic counter that increments on every event the manager fans out
+   * to subscribers (FlowMachine state change OR Wallet Standard registry
+   * change). Use as the snapshot value for React's
+   * `useSyncExternalStore` so registry-only updates trigger a re-render
+   * even when the FlowState string is unchanged.
+   */
+  getVersion(): number
   subscribe(listener: StateListener): Unsubscribe
   /** Detach from the wallet-standard registry and tear down adapters. Idempotent. */
   destroy(): void
@@ -153,23 +185,73 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
   const platform = detectPlatform()
 
   const machine = createFlowMachine()
-  // Bridge machine state → consumer's onStateChange callback. Listener
-  // exceptions are already isolated by the FlowMachine's queueMicrotask
-  // rethrow (TASK-104 hardening). Capture the unsubscribe so `destroy()`
-  // can detach cleanly (tidiness — the FlowMachine is GC'd with the
-  // manager so it's not a real leak, but explicit cleanup is good form).
+
+  // Manager-level subscribers fan-out. FlowMachine state changes AND
+  // Wallet Standard registry changes are both routed through this set so
+  // consumers (React's `useSyncExternalStore`, Vue's `watch`) re-render on
+  // either signal. Listener exceptions are isolated via the
+  // `queueMicrotask` rethrow pattern used by the FlowMachine (TASK-104)
+  // and discovery (TASK-107).
+  const listeners = new Set<StateListener>()
+  let version = 0
+  function notify(): void {
+    version += 1
+    const state = machine.getState()
+    for (const listener of [...listeners]) {
+      try {
+        listener(state)
+      } catch (err) {
+        queueMicrotask(() => {
+          throw err
+        })
+      }
+    }
+  }
+
+  // Bridge machine state → consumer's onStateChange callback AND the
+  // manager fan-out. Capture the unsubscribe so `destroy()` can detach
+  // cleanly.
   const unsubscribeStateChange = machine.subscribe((state) => {
     config.onStateChange?.(state)
+    notify()
   })
 
   // Lazy adapter holders — populated based on the platform strategy.
   let discoveryHandle: DiscoveryHandle | null = null
   let deepLinkAdapter: DeepLinkAdapter | null = null
+  let unsubscribeDiscovery: (() => void) | null = null
 
   if (platform.strategy === 'extension') {
     discoveryHandle = discoverStandardWallets()
+    // Registry changes invalidate the augmented platform cache and
+    // re-notify subscribers so the sorted list + install badge reflect a
+    // late-registering Opindex.
+    unsubscribeDiscovery = discoveryHandle.subscribe(() => {
+      augmentedPlatformCache = null
+      notify()
+    })
   } else if (platform.strategy === 'deeplink') {
     deepLinkAdapter = createDeepLinkAdapterForConfig(config, platform, cluster)
+  }
+
+  // Cache of the augmented platform. Invalidated on every registry
+  // change; recomputed lazily when {@link getPlatform} or
+  // {@link getSortedWallets} is called.
+  let augmentedPlatformCache: PlatformInfo | null = null
+  function getAugmentedPlatform(): PlatformInfo {
+    if (augmentedPlatformCache) return augmentedPlatformCache
+    let hasOpindexExtension = platform.hasOpindexExtension
+    if (!hasOpindexExtension && pinnedWallet && discoveryHandle) {
+      const pinnedConfig = config.wallets.find((w) => w.id === pinnedWallet)
+      if (pinnedConfig) {
+        const adapters = discoveryHandle.getAdapters()
+        if (adapters.some((a) => walletConfigMatchesName(pinnedConfig, a.wallet.name))) {
+          hasOpindexExtension = true
+        }
+      }
+    }
+    augmentedPlatformCache = { ...platform, hasOpindexExtension }
+    return augmentedPlatformCache
   }
 
   let destroyed = false
@@ -215,6 +297,43 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
 
   function findWalletConfig(walletId: string): WalletConfig | null {
     return config.wallets.find((w) => w.id === walletId) ?? null
+  }
+
+  /**
+   * Synthesize a minimal {@link WalletConfig} for a wallet that lives only
+   * in the Wallet Standard registry (no matching entry in
+   * `config.wallets`). The slug is the lowercased / dash-normalized
+   * wallet name from {@link walletNameSlug}, so consumers calling
+   * `connect(entry.id)` on a `source: 'discovered'` {@link WalletListEntry}
+   * land here.
+   *
+   * Returns null when discovery isn't running (mobile / install-prompt
+   * strategies) or when no adapter slugs to the requested id. The deep-link
+   * fields are empty strings — never read on the `extension` strategy
+   * (the only strategy where discovery runs).
+   */
+  function buildDiscoveredWalletConfig(walletId: string): WalletConfig | null {
+    if (!discoveryHandle) return null
+    const adapter = discoveryHandle
+      .getAdapters()
+      .find((a) => walletNameSlug(a.wallet.name) === walletId)
+    if (!adapter) return null
+    return {
+      id: walletId,
+      name: adapter.wallet.name,
+      priority: Number.MAX_SAFE_INTEGER,
+      icon: adapter.wallet.icon ?? '',
+      deepLinkScheme: '',
+      universalLink: '',
+      appStoreUrl: '',
+      playStoreUrl: '',
+      standardName: asWalletName(adapter.wallet.name),
+    }
+  }
+
+  /** `findWalletConfig` with discovered-only fallback. */
+  function resolveWalletConfig(walletId: string): WalletConfig | null {
+    return findWalletConfig(walletId) ?? buildDiscoveredWalletConfig(walletId)
   }
 
   function reportError(err: unknown): WalletError {
@@ -263,10 +382,12 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
   }
 
   async function doConnect(walletId: string): Promise<void> {
-    const walletConfig = findWalletConfig(walletId)
+    const walletConfig = resolveWalletConfig(walletId)
     if (!walletConfig) {
       throw reportError(
-        new WalletConnectionError(`Wallet '${walletId}' is not registered in the manager config`),
+        new WalletConnectionError(
+          `Wallet '${walletId}' is not registered in the manager config and not detected via Wallet Standard`,
+        ),
       )
     }
 
@@ -386,9 +507,11 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
     if (!ctx.walletId) {
       throw new WalletNotConnectedError('No wallet is connected')
     }
-    const walletConfig = findWalletConfig(ctx.walletId)
+    const walletConfig = resolveWalletConfig(ctx.walletId)
     if (!walletConfig) {
-      throw new WalletNotConnectedError(`Connected wallet '${ctx.walletId}' is not in the config`)
+      throw new WalletNotConnectedError(
+        `Connected wallet '${ctx.walletId}' is no longer registered`,
+      )
     }
     const adapter = findStandardAdapter(walletConfig)
     if (!adapter) {
@@ -416,7 +539,7 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
     if (platform.strategy === 'extension') {
       const ctx = machine.getContext()
       if (ctx.walletId) {
-        const walletConfig = findWalletConfig(ctx.walletId)
+        const walletConfig = resolveWalletConfig(ctx.walletId)
         if (walletConfig) {
           const adapter = findStandardAdapter(walletConfig)
           if (adapter) {
@@ -441,26 +564,58 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
 
   return {
     initialize,
-    getSortedWallets: () =>
-      getSortedWallets(config.wallets, platform, { pinnedWalletId: pinnedWallet }),
+    getSortedWallets: () => {
+      const augmented = getAugmentedPlatform()
+      let entries = mergeWalletList(config.wallets, discoveryHandle?.getAdapters() ?? [])
+      // `mergeWalletList` only sees the Wallet Standard registry. The
+      // augmented platform also considers the legacy `window.opindex`
+      // sentinel — when that says the pinned wallet is installed but the
+      // registry doesn't have it (rare in production; real Opindex
+      // registers via Wallet Standard), reflect that as `isDetected: true`
+      // on the pinned entry so the badge renders "Detected" instead of
+      // "Install". Pure helper; doesn't mutate `entries`.
+      if (pinnedWallet && augmented.hasOpindexExtension) {
+        entries = entries.map((e) =>
+          e.id === pinnedWallet && !e.isDetected ? { ...e, isDetected: true } : e,
+        )
+      }
+      return getSortedWallets(entries, augmented, { pinnedWalletId: pinnedWallet })
+    },
     connect,
     disconnect,
     signMessage,
     signIn,
     getState: () => machine.getState(),
     getContext: () => machine.getContext(),
+    getPlatform: () => getAugmentedPlatform(),
+    getVersion: () => version,
     subscribe: (listener) => {
       assertAlive()
-      return machine.subscribe(listener)
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
     },
     destroy: () => {
       if (destroyed) return
       destroyed = true
       unsubscribeStateChange()
+      if (unsubscribeDiscovery) unsubscribeDiscovery()
+      listeners.clear()
       if (discoveryHandle) discoveryHandle.destroy()
       if (deepLinkAdapter) deepLinkAdapter.destroy()
     },
   }
+}
+
+/**
+ * True if a registered Wallet Standard wallet name matches the given
+ * {@link WalletConfig}. Prefers `standardName` (exact match); falls back
+ * to case-insensitive `name`. Pure / safe to call with any string.
+ */
+function walletConfigMatchesName(walletConfig: WalletConfig, name: string): boolean {
+  if (walletConfig.standardName && walletConfig.standardName === name) return true
+  return walletConfig.name.toLowerCase() === name.toLowerCase()
 }
 
 function createDeepLinkAdapterForConfig(

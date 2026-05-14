@@ -41,6 +41,7 @@ import type {
   Unsubscribe,
   WalletAdapter,
   WalletConfig,
+  WalletListEntry,
   WalletManager,
   WalletManagerConfig,
   WalletName,
@@ -83,6 +84,7 @@ type _Slots = {
   unsubscribe: Unsubscribe
   walletAdapter: WalletAdapter
   walletConfig: WalletConfig
+  walletListEntry: WalletListEntry
   walletManager: WalletManager
   walletManagerConfig: WalletManagerConfig
   walletName: WalletName
@@ -145,11 +147,12 @@ describe('public types barrel', () => {
       unsubscribe: 'unsubscribe',
       walletAdapter: 'walletAdapter',
       walletConfig: 'walletConfig',
+      walletListEntry: 'walletListEntry',
       walletManager: 'walletManager',
       walletManagerConfig: 'walletManagerConfig',
       walletName: 'walletName',
     }
-    expect(Object.keys(slots)).toHaveLength(36)
+    expect(Object.keys(slots)).toHaveLength(37)
   })
 
   it('PLAN.md TASK-110 lists 10 core types — verify each by name', () => {

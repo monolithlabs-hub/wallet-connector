@@ -1,5 +1,6 @@
 import { createFocusTrap, getFocusableElements, type FocusTrap } from './focus-trap'
 import { lockBodyScroll } from './scroll-lock'
+import { injectModalStyles } from './styles'
 
 /**
  * Options accepted by {@link attachModal}.
@@ -64,6 +65,8 @@ export function attachModal(options: AttachModalOptions): ModalHandle {
   if (typeof document === 'undefined') {
     return { destroy: () => undefined }
   }
+
+  injectModalStyles()
 
   const { root, onRequestClose, initialFocus, scrollLock = true, restoreFocus = true } = options
 

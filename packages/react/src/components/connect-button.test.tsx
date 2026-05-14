@@ -3,63 +3,53 @@ import {
   WalletConnectionError,
   type FlowMachine,
   type PlatformInfo,
-  type WalletConfig,
+  type WalletListEntry,
   type WalletManager,
 } from '@monolithlabs/wallet-connect-core'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { type ReactNode } from 'react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { WalletConnectContext } from '../context/wallet-connect-context'
 
 import { ConnectButton } from './connect-button'
 
-// --- Module mock: control detectPlatform per-test ------------------------
-
-const mocks = vi.hoisted(() => ({
-  detectPlatform: vi.fn<() => PlatformInfo>(),
-}))
-
-vi.mock('@monolithlabs/wallet-connect-core', async () => {
-  const actual = await vi.importActual<typeof import('@monolithlabs/wallet-connect-core')>(
-    '@monolithlabs/wallet-connect-core',
-  )
-  return {
-    ...actual,
-    detectPlatform: mocks.detectPlatform,
-  }
-})
-
 // --- Fixtures ------------------------------------------------------------
 
-const OPINDEX: WalletConfig = {
+const OPINDEX: WalletListEntry = {
   id: 'opindex',
   name: 'Opindex',
   priority: 10,
   icon: '',
+  isDetected: false,
+  source: 'configured',
   deepLinkScheme: 'opindex://',
   universalLink: 'https://opindex.app/ul/v1/connect',
   appStoreUrl: '',
   playStoreUrl: '',
 }
 
-const PHANTOM: WalletConfig = {
+const PHANTOM: WalletListEntry = {
   id: 'phantom',
   name: 'Phantom',
   priority: 1,
   icon: '',
+  isDetected: false,
+  source: 'configured',
   deepLinkScheme: 'phantom://',
   universalLink: 'https://phantom.app/ul/v1/connect',
   appStoreUrl: '',
   playStoreUrl: '',
 }
 
-const SOLFLARE: WalletConfig = {
+const SOLFLARE: WalletListEntry = {
   id: 'solflare',
   name: 'Solflare',
   priority: 2,
   icon: '',
+  isDetected: false,
+  source: 'configured',
   deepLinkScheme: 'solflare://',
   universalLink: 'https://solflare.com/ul/v1/connect',
   appStoreUrl: '',
@@ -101,11 +91,16 @@ interface MockManager {
   connectSpy: ReturnType<typeof vi.fn>
   disconnectSpy: ReturnType<typeof vi.fn>
   initializeSpy: ReturnType<typeof vi.fn>
+  setPlatform: (next: PlatformInfo) => void
+  setSortedWallets: (next: WalletListEntry[]) => void
+  /** Force a registry-style notification without changing FlowState. */
+  notifyRegistryChange: () => void
 }
 
 function makeMockManager(opts: {
-  wallets: WalletConfig[]
-  sortedWallets?: WalletConfig[]
+  wallets: WalletListEntry[]
+  sortedWallets?: WalletListEntry[]
+  platform?: PlatformInfo
 }): MockManager {
   const machine = createFlowMachine()
   const connectSpy = vi.fn(async (walletId: string) => {
@@ -116,6 +111,24 @@ function makeMockManager(opts: {
   })
   const initializeSpy = vi.fn()
 
+  let platform: PlatformInfo = opts.platform ?? {
+    isMobile: false,
+    isIOS: false,
+    isAndroid: false,
+    hasExtension: true,
+    hasOpindexExtension: false,
+    strategy: 'extension',
+  }
+  let sorted: WalletListEntry[] = opts.sortedWallets ?? opts.wallets
+  let version = 0
+  const listeners = new Set<(state: ReturnType<FlowMachine['getState']>) => void>()
+  function notify() {
+    version += 1
+    const state = machine.getState()
+    for (const listener of [...listeners]) listener(state)
+  }
+  machine.subscribe(() => notify())
+
   const manager: WalletManager = {
     initialize: initializeSpy,
     connect: connectSpy,
@@ -124,12 +137,32 @@ function makeMockManager(opts: {
     signIn: vi.fn(),
     getState: () => machine.getState(),
     getContext: () => machine.getContext(),
-    getSortedWallets: () => opts.sortedWallets ?? opts.wallets,
-    subscribe: (listener) => machine.subscribe(listener),
+    getSortedWallets: () => sorted,
+    getPlatform: () => platform,
+    getVersion: () => version,
+    subscribe: (listener) => {
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
+    },
     destroy: vi.fn(),
   }
 
-  return { manager, machine, connectSpy, disconnectSpy, initializeSpy }
+  return {
+    manager,
+    machine,
+    connectSpy,
+    disconnectSpy,
+    initializeSpy,
+    setPlatform: (next) => {
+      platform = next
+    },
+    setSortedWallets: (next) => {
+      sorted = next
+    },
+    notifyRegistryChange: () => notify(),
+  }
 }
 
 function wrap(manager: WalletManager) {
@@ -137,10 +170,6 @@ function wrap(manager: WalletManager) {
     return <WalletConnectContext.Provider value={manager}>{children}</WalletConnectContext.Provider>
   }
 }
-
-beforeEach(() => {
-  mocks.detectPlatform.mockReturnValue(DESKTOP_NO_EXTENSION)
-})
 
 afterEach(() => {
   // DOM cleanup is owned by `packages/react/vitest.setup.ts`.
@@ -182,12 +211,12 @@ describe('ConnectButton', () => {
   })
 
   it('wallet list shows Opindex first on mobile', async () => {
-    mocks.detectPlatform.mockReturnValue(MOBILE_PLATFORM)
     const user = userEvent.setup()
     // Sorted output: Opindex pinned first on mobile (per TASK-102 rules).
     const mock = makeMockManager({
       wallets: [PHANTOM, SOLFLARE, OPINDEX],
       sortedWallets: [OPINDEX, PHANTOM, SOLFLARE],
+      platform: MOBILE_PLATFORM,
     })
     render(<ConnectButton />, { wrapper: wrap(mock.manager) })
 
@@ -205,11 +234,11 @@ describe('ConnectButton', () => {
   })
 
   it('Opindex shows the "Get" badge on mobile', async () => {
-    mocks.detectPlatform.mockReturnValue(MOBILE_PLATFORM)
     const user = userEvent.setup()
     const mock = makeMockManager({
       wallets: [OPINDEX, PHANTOM],
       sortedWallets: [OPINDEX, PHANTOM],
+      platform: MOBILE_PLATFORM,
     })
     render(<ConnectButton />, { wrapper: wrap(mock.manager) })
 
@@ -223,11 +252,11 @@ describe('ConnectButton', () => {
   })
 
   it('Opindex shows the "Install" badge on desktop without the extension', async () => {
-    mocks.detectPlatform.mockReturnValue(DESKTOP_NO_EXTENSION)
     const user = userEvent.setup()
     const mock = makeMockManager({
       wallets: [OPINDEX, PHANTOM],
       sortedWallets: [OPINDEX, PHANTOM],
+      platform: DESKTOP_NO_EXTENSION,
     })
     render(<ConnectButton />, { wrapper: wrap(mock.manager) })
 
@@ -237,12 +266,41 @@ describe('ConnectButton', () => {
     expect(opindexButton?.textContent).toContain('Install')
   })
 
-  it('Opindex shows no badge on desktop when the extension is detected', async () => {
-    mocks.detectPlatform.mockReturnValue(DESKTOP_WITH_OPINDEX)
+  it('Opindex badge flips from "Install" to "Detected" when the registry registers it late', async () => {
+    // Late-registering Opindex: when the Wallet Standard registration
+    // lands, the manager re-runs `mergeWalletList` (which sets
+    // `isDetected: true` on the matching configured entry), the hook
+    // re-renders, and the "Install" badge swaps for "Detected".
     const user = userEvent.setup()
     const mock = makeMockManager({
       wallets: [OPINDEX, PHANTOM],
       sortedWallets: [OPINDEX, PHANTOM],
+      platform: DESKTOP_NO_EXTENSION,
+    })
+    render(<ConnectButton />, { wrapper: wrap(mock.manager) })
+
+    await user.click(screen.getByRole('button', { name: /connect wallet/i }))
+
+    let opindexButton = screen.getByRole('dialog').querySelector('[data-wallet-id="opindex"]')
+    expect(opindexButton?.textContent).toContain('Install')
+
+    await act(async () => {
+      mock.setPlatform(DESKTOP_WITH_OPINDEX)
+      mock.setSortedWallets([{ ...OPINDEX, isDetected: true }, PHANTOM])
+      mock.notifyRegistryChange()
+    })
+
+    opindexButton = screen.getByRole('dialog').querySelector('[data-wallet-id="opindex"]')
+    expect(opindexButton?.textContent).not.toContain('Install')
+    expect(opindexButton?.textContent).toContain('Detected')
+  })
+
+  it('Opindex shows "Detected" on desktop when the extension is registered', async () => {
+    const user = userEvent.setup()
+    const mock = makeMockManager({
+      wallets: [OPINDEX, PHANTOM],
+      sortedWallets: [{ ...OPINDEX, isDetected: true }, PHANTOM],
+      platform: DESKTOP_WITH_OPINDEX,
     })
     render(<ConnectButton />, { wrapper: wrap(mock.manager) })
 
@@ -251,6 +309,74 @@ describe('ConnectButton', () => {
     const opindexButton = screen.getByRole('dialog').querySelector('[data-wallet-id="opindex"]')
     expect(opindexButton?.textContent).not.toContain('Get')
     expect(opindexButton?.textContent).not.toContain('Install')
+    expect(opindexButton?.textContent).toContain('Detected')
+  })
+
+  it('configured wallet with isDetected: true renders the "Detected" badge', async () => {
+    const user = userEvent.setup()
+    const mock = makeMockManager({
+      wallets: [PHANTOM],
+      sortedWallets: [{ ...PHANTOM, isDetected: true }],
+      platform: {
+        isMobile: false,
+        isIOS: false,
+        isAndroid: false,
+        hasExtension: true,
+        hasOpindexExtension: false,
+        strategy: 'extension',
+      },
+    })
+    render(<ConnectButton />, { wrapper: wrap(mock.manager) })
+
+    await user.click(screen.getByRole('button', { name: /connect wallet/i }))
+
+    const phantom = screen.getByRole('dialog').querySelector('[data-wallet-id="phantom"]')
+    expect(phantom?.textContent).toContain('Detected')
+    expect(phantom?.textContent).not.toContain('Install')
+  })
+
+  it('discovered-only wallet appears with its name + "Detected" badge', async () => {
+    const user = userEvent.setup()
+    const BACKPACK_DISCOVERED: WalletListEntry = {
+      id: 'backpack',
+      name: 'Backpack',
+      priority: Number.MAX_SAFE_INTEGER,
+      icon: 'data:image/svg+xml;base64,BP',
+      isDetected: true,
+      source: 'discovered',
+    }
+    const mock = makeMockManager({
+      wallets: [PHANTOM],
+      sortedWallets: [PHANTOM, BACKPACK_DISCOVERED],
+    })
+    render(<ConnectButton />, { wrapper: wrap(mock.manager) })
+
+    await user.click(screen.getByRole('button', { name: /connect wallet/i }))
+
+    const backpack = screen.getByRole('dialog').querySelector('[data-wallet-id="backpack"]')
+    expect(backpack).not.toBeNull()
+    expect(backpack?.textContent).toContain('Backpack')
+    expect(backpack?.textContent).toContain('Detected')
+  })
+
+  it('non-pinned, non-detected wallet renders without any badge', async () => {
+    const user = userEvent.setup()
+    // Phantom isn't pinned and isn't detected — should produce no badge
+    // (regression guard against the old behavior that suppressed
+    // non-pinned install badges).
+    const mock = makeMockManager({
+      wallets: [PHANTOM],
+      sortedWallets: [PHANTOM],
+      platform: DESKTOP_NO_EXTENSION,
+    })
+    render(<ConnectButton />, { wrapper: wrap(mock.manager) })
+
+    await user.click(screen.getByRole('button', { name: /connect wallet/i }))
+
+    const phantom = screen.getByRole('dialog').querySelector('[data-wallet-id="phantom"]')
+    expect(phantom?.textContent).not.toContain('Install')
+    expect(phantom?.textContent).not.toContain('Get')
+    expect(phantom?.textContent).not.toContain('Detected')
   })
 
   it('clicking a wallet calls manager.connect() with the correct walletId', async () => {
