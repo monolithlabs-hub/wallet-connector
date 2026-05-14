@@ -61,6 +61,17 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
 
+    // --- Example-app smoke spec (PLAN.md TASK-601 acceptance). Tests
+    //     that every demo route loads without console errors and that
+    //     the modal opens. Single-browser by design — the underlying
+    //     engine differences are already covered by the desktop / mobile
+    //     specs. ---
+    {
+      name: 'smoke',
+      testMatch: /example-app-smoke\.spec\.ts$/,
+      use: { ...devices['Desktop Chrome'] },
+    },
+
     // --- Desktop specs run on the three engine families. Chromium and
     //     WebKit have different focus / rendering quirks that the
     //     modal must handle. ---
