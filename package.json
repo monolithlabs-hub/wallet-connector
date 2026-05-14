@@ -12,7 +12,8 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "size": "turbo run size",
+    "size": "size-limit",
+    "size:ci": "size-limit --json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "docs:link-check": "node scripts/check-md-links.mjs",
@@ -22,6 +23,39 @@
     "e2e:install": "playwright install --with-deps chromium firefox webkit",
     "prepare": "husky"
   },
+  "size-limit": [
+    {
+      "name": "core (ESM, gzip)",
+      "path": "packages/core/dist/index.mjs",
+      "limit": "30 KB",
+      "gzip": true
+    },
+    {
+      "name": "react (adapter only, ESM, gzip)",
+      "path": "packages/react/dist/index.mjs",
+      "import": "*",
+      "limit": "5 KB",
+      "gzip": true,
+      "ignore": [
+        "@monolithlabs-hub/wallet-connect-core",
+        "@monolithlabs-hub/wallet-connect-ui",
+        "react",
+        "react-dom"
+      ]
+    },
+    {
+      "name": "vue (adapter only, ESM, gzip)",
+      "path": "packages/vue/dist/index.mjs",
+      "import": "*",
+      "limit": "5 KB",
+      "gzip": true,
+      "ignore": [
+        "@monolithlabs-hub/wallet-connect-core",
+        "@monolithlabs-hub/wallet-connect-ui",
+        "vue"
+      ]
+    }
+  ],
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
     "@commitlint/cli": "^20.5.3",
