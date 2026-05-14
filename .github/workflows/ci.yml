@@ -58,6 +58,9 @@ jobs:
       - name: Test (with coverage)
         run: pnpm turbo test
 
+      - name: Check documentation links
+        run: pnpm docs:link-check
+
       - name: Upload coverage
         if: always()
         uses: actions/upload-artifact@v4

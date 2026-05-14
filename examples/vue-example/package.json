@@ -1,0 +1,21 @@
+{
+  "name": "@monolithlabs/wallet-connect-vue-example",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit -p tsconfig.json && vite build",
+    "preview": "vite preview --port 4174 --strictPort"
+  },
+  "dependencies": {
+    "@monolithlabs/wallet-connect-core": "workspace:*",
+    "@monolithlabs/wallet-connect-vue": "workspace:*",
+    "vue": "^3.5.34"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.6",
+    "vite": "^8.0.12",
+    "vue-tsc": "^3.2.8"
+  }
+}
