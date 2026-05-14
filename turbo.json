@@ -14,11 +14,6 @@
     "typecheck": {
       "dependsOn": ["^build"],
       "outputs": []
-    },
-    "size": {
-      "dependsOn": ["build"],
-      "outputs": [],
-      "inputs": ["dist/**", "package.json"]
     }
   }
 }
