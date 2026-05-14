@@ -26,6 +26,18 @@ npm install @monolithlabs-hub/wallet-connect-vue
 
 Peer dependencies: `react >= 19` / `react-dom >= 19` for the React package, `vue ^3.5` for the Vue package. The framework package pulls in `@monolithlabs-hub/wallet-connect-core` automatically.
 
+## Bundle size
+
+Published bundle sizes are gated in CI via [`size-limit`](https://github.com/ai/size-limit). The `react` and `vue` numbers are **adapter only** — `@monolithlabs-hub/wallet-connect-core` and `@monolithlabs-hub/wallet-connect-ui` are marked external during measurement so the figure reflects what a consumer's bundler adds on top of core, not the rebundled core code.
+
+| Package                                  | Limit (gzip) | Current (gzip) |
+| ---------------------------------------- | ------------ | -------------- |
+| `@monolithlabs-hub/wallet-connect-core`  | 30 kB        | 20.05 kB       |
+| `@monolithlabs-hub/wallet-connect-react` | 5 kB         | 2.98 kB        |
+| `@monolithlabs-hub/wallet-connect-vue`   | 5 kB         | 3.76 kB        |
+
+CI fails on any PR that exceeds these limits and posts the diff against `main` as a PR comment. Run `pnpm size` locally before pushing.
+
 ## Usage
 
 The minimum viable Connect Wallet button — pick your framework:
@@ -172,6 +184,13 @@ Runnable reference app:
 - `examples/vue-example/` — Vite + Vue 3.5 demo with four scenarios (basic connect, SIWS, custom priority, neutral mode). Run with `pnpm --filter @monolithlabs-hub/wallet-connect-vue-example dev`.
 
 A matching React example is planned (PLAN.md TASK-601).
+
+## Contributing
+
+PRs and issues welcome. Start with [`CONTRIBUTING.md`](./CONTRIBUTING.md) — it covers the changeset requirement, branch workflow, and local verification steps. By participating you agree to the [Code of Conduct](./CODE_OF_CONDUCT.md).
+
+- **Bug reports / feature requests:** use the [issue templates](https://github.com/monolithlabs-hub/wallet-connector/issues/new/choose).
+- **Security vulnerabilities:** report privately via [GitHub Security Advisories](https://github.com/monolithlabs-hub/wallet-connector/security/advisories/new) — see [`SECURITY.md`](./SECURITY.md).
 
 ## License
 

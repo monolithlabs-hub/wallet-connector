@@ -1,0 +1,80 @@
+name: Bug report
+description: Report a reproducible bug in @monolithlabs-hub/wallet-connect.
+title: '[bug] '
+labels: ['bug', 'needs-triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please fill out the sections below so we can reproduce and fix it quickly.
+
+        > For security vulnerabilities (anything that affects user funds, keys, or sessions): **do not file a public issue.** Use the [private security advisory link on the issue picker](https://github.com/monolithlabs-hub/wallet-connector/security/advisories/new) instead.
+  - type: input
+    id: package
+    attributes:
+      label: Affected package
+      description: Which `@monolithlabs-hub/wallet-connect-*` package is involved?
+      placeholder: '@monolithlabs-hub/wallet-connect-react'
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Package version
+      description: Output of `pnpm list <package>` or the value from your lockfile.
+      placeholder: '1.0.0'
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      description: Where does the bug reproduce?
+      multiple: true
+      options:
+        - Desktop Chrome
+        - Desktop Firefox
+        - Desktop Safari
+        - iOS Safari
+        - Android Chrome
+        - Wallet in-app browser (Phantom / Solflare / Backpack)
+        - Node.js / SSR
+        - Other (describe below)
+    validations:
+      required: true
+  - type: input
+    id: wallet
+    attributes:
+      label: Wallet
+      description: Which wallet was selected when the bug occurred? (e.g., Phantom, Solflare, Backpack, Opindex, none)
+      placeholder: 'Phantom'
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: |
+        Minimal steps to reproduce. A link to a runnable repro (StackBlitz, CodeSandbox, GitHub repo) is the fastest path to a fix. Otherwise paste the minimum `<ConnectButton/>` config and the click sequence that triggers the bug.
+      placeholder: |
+        1. Configure WalletManager with `wallets: [PHANTOM]` and `requireSignIn: true`.
+        2. Click `<ConnectButton/>`.
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include exact error messages, stack traces, console output, and screenshots if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Anything else that might be relevant — network conditions, custom config, recent changes on your side.

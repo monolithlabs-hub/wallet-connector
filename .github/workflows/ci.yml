@@ -72,3 +72,43 @@ jobs:
           path: packages/*/coverage/
           if-no-files-found: ignore
           retention-days: 14
+
+  size:
+    name: Bundle size
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Stage size-limit wrapper outside the working tree
+        # andresz1/size-limit-action does its own `git checkout -f <branch>` to
+        # measure both `main` and the PR head. That checkout removes any file
+        # not tracked on the target branch — including this wrapper on the very
+        # first PR that adds bundle-size monitoring. Copy it to $RUNNER_TEMP so
+        # both branch runs can invoke the same wrapper regardless of which
+        # commit is checked out.
+        run: |
+          mkdir -p "$RUNNER_TEMP/sizelimit"
+          cp scripts/size-ci.mjs "$RUNNER_TEMP/sizelimit/size-ci.mjs"
+
+      - name: Check bundle size
+        uses: andresz1/size-limit-action@v1.8.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          package_manager: pnpm
+          build_script: build
+          script: node ${{ runner.temp }}/sizelimit/size-ci.mjs
