@@ -1,0 +1,14 @@
+{
+  "concurrency": 10,
+  "retry": true,
+  "skip": [
+    "^https?://example\\.com",
+    "^https?://myapp\\.example",
+    "^https?://opindex\\.app",
+    "^https?://apps\\.apple\\.com/",
+    "^https?://play\\.google\\.com/",
+    "OWNER/REPO",
+    "^https?://(www\\.)?npmjs\\.com/package/@monolithlabs/",
+    "^https?://img\\.shields\\.io/npm/v/@monolithlabs/"
+  ]
+}
