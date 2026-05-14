@@ -26,6 +26,18 @@ npm install @monolithlabs-hub/wallet-connect-vue
 
 Peer dependencies: `react >= 19` / `react-dom >= 19` for the React package, `vue ^3.5` for the Vue package. The framework package pulls in `@monolithlabs-hub/wallet-connect-core` automatically.
 
+## Bundle size
+
+Published bundle sizes are gated in CI via [`size-limit`](https://github.com/ai/size-limit). The `react` and `vue` numbers are **adapter only** — `@monolithlabs-hub/wallet-connect-core` and `@monolithlabs-hub/wallet-connect-ui` are marked external during measurement so the figure reflects what a consumer's bundler adds on top of core, not the rebundled core code.
+
+| Package                                  | Limit (gzip) | Current (gzip) |
+| ---------------------------------------- | ------------ | -------------- |
+| `@monolithlabs-hub/wallet-connect-core`  | 30 kB        | 20.05 kB       |
+| `@monolithlabs-hub/wallet-connect-react` | 5 kB         | 2.98 kB        |
+| `@monolithlabs-hub/wallet-connect-vue`   | 5 kB         | 3.76 kB        |
+
+CI fails on any PR that exceeds these limits and posts the diff against `main` as a PR comment. Run `pnpm size` locally before pushing.
+
 ## Usage
 
 The minimum viable Connect Wallet button — pick your framework:

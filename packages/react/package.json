@@ -59,8 +59,24 @@
     "test": "vitest run --coverage",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "size": "size-limit",
     "prepack": "cp ../../LICENSE ."
   },
+  "size-limit": [
+    {
+      "name": "react (adapter only, ESM, gzip)",
+      "path": "dist/index.mjs",
+      "import": "*",
+      "limit": "5 KB",
+      "gzip": true,
+      "ignore": [
+        "@monolithlabs-hub/wallet-connect-core",
+        "@monolithlabs-hub/wallet-connect-ui",
+        "react",
+        "react-dom"
+      ]
+    }
+  ],
   "dependencies": {
     "@monolithlabs-hub/wallet-connect-core": "workspace:*",
     "@monolithlabs-hub/wallet-connect-ui": "workspace:*"
