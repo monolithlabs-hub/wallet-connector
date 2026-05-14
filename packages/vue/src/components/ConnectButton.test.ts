@@ -2,7 +2,7 @@ import {
   createFlowMachine,
   type FlowMachine,
   type PlatformInfo,
-  type WalletConfig,
+  type WalletListEntry,
   type WalletManager,
 } from '@monolithlabs/wallet-connect-core'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
@@ -15,33 +15,39 @@ import ConnectButton from './ConnectButton.vue'
 
 // --- Fixtures ------------------------------------------------------------
 
-const OPINDEX: WalletConfig = {
+const OPINDEX: WalletListEntry = {
   id: 'opindex',
   name: 'Opindex',
   priority: 10,
   icon: '',
+  isDetected: false,
+  source: 'configured',
   deepLinkScheme: 'opindex://',
   universalLink: 'https://opindex.app/ul/v1/connect',
   appStoreUrl: '',
   playStoreUrl: '',
 }
 
-const PHANTOM: WalletConfig = {
+const PHANTOM: WalletListEntry = {
   id: 'phantom',
   name: 'Phantom',
   priority: 1,
   icon: '',
+  isDetected: false,
+  source: 'configured',
   deepLinkScheme: 'phantom://',
   universalLink: 'https://phantom.app/ul/v1/connect',
   appStoreUrl: '',
   playStoreUrl: '',
 }
 
-const SOLFLARE: WalletConfig = {
+const SOLFLARE: WalletListEntry = {
   id: 'solflare',
   name: 'Solflare',
   priority: 2,
   icon: '',
+  isDetected: false,
+  source: 'configured',
   deepLinkScheme: 'solflare://',
   universalLink: 'https://solflare.com/ul/v1/connect',
   appStoreUrl: '',
@@ -83,13 +89,14 @@ interface MockManager {
   connectSpy: ReturnType<typeof vi.fn>
   disconnectSpy: ReturnType<typeof vi.fn>
   setPlatform: (next: PlatformInfo) => void
+  setSortedWallets: (next: WalletListEntry[]) => void
   /** Force a registry-style notification without changing FlowState. */
   notifyRegistryChange: () => void
 }
 
 function makeMockManager(opts: {
-  wallets: WalletConfig[]
-  sortedWallets?: WalletConfig[]
+  wallets: WalletListEntry[]
+  sortedWallets?: WalletListEntry[]
   platform?: PlatformInfo
 }): MockManager {
   const machine = createFlowMachine()
@@ -101,6 +108,7 @@ function makeMockManager(opts: {
   })
 
   let platform: PlatformInfo = opts.platform ?? DESKTOP_NO_EXTENSION
+  let sorted: WalletListEntry[] = opts.sortedWallets ?? opts.wallets
   let version = 0
   const listeners = new Set<(state: ReturnType<FlowMachine['getState']>) => void>()
   function notify() {
@@ -118,7 +126,7 @@ function makeMockManager(opts: {
     signIn: vi.fn(),
     getState: () => machine.getState(),
     getContext: () => machine.getContext(),
-    getSortedWallets: () => opts.sortedWallets ?? opts.wallets,
+    getSortedWallets: () => sorted,
     getPlatform: () => platform,
     getVersion: () => version,
     subscribe: (listener) => {
@@ -136,6 +144,9 @@ function makeMockManager(opts: {
     disconnectSpy,
     setPlatform: (next) => {
       platform = next
+    },
+    setSortedWallets: (next) => {
+      sorted = next
     },
     notifyRegistryChange: () => notify(),
   }
@@ -259,10 +270,11 @@ describe('ConnectButton.vue', () => {
     expect(opindex?.textContent).toContain('Install')
   })
 
-  it('Opindex badge updates when the registry registers it late', async () => {
-    // Late-registering Opindex (real-extension path): the manager fires
-    // a registry notification, the composable's subscribe callback
-    // updates the platform ref, and the badge disappears.
+  it('Opindex badge flips from "Install" to "Detected" when the registry registers it late', async () => {
+    // Late-registering Opindex: when the Wallet Standard registration
+    // lands, `mergeWalletList` flips `isDetected: true` on the matching
+    // configured entry, the composable's subscribe callback re-pulls
+    // sortedWallets, and the "Install" badge swaps for "Detected".
     const mock = makeMockManager({
       wallets: [OPINDEX, PHANTOM],
       sortedWallets: [OPINDEX, PHANTOM],
@@ -276,17 +288,19 @@ describe('ConnectButton.vue', () => {
     expect(opindex?.textContent).toContain('Install')
 
     mock.setPlatform(DESKTOP_WITH_OPINDEX)
+    mock.setSortedWallets([{ ...OPINDEX, isDetected: true }, PHANTOM])
     mock.notifyRegistryChange()
     await nextTick()
 
     opindex = document.body.querySelector('[data-wallet-id="opindex"]')
     expect(opindex?.textContent).not.toContain('Install')
+    expect(opindex?.textContent).toContain('Detected')
   })
 
-  it('Opindex shows no badge on desktop when the extension is detected', async () => {
+  it('Opindex shows "Detected" on desktop when the extension is registered', async () => {
     const mock = makeMockManager({
       wallets: [OPINDEX, PHANTOM],
-      sortedWallets: [OPINDEX, PHANTOM],
+      sortedWallets: [{ ...OPINDEX, isDetected: true }, PHANTOM],
       platform: DESKTOP_WITH_OPINDEX,
     })
     const wrapper = mountButton(mock.manager)
@@ -296,6 +310,57 @@ describe('ConnectButton.vue', () => {
     const opindex = document.body.querySelector('[data-wallet-id="opindex"]')
     expect(opindex?.textContent).not.toContain('Get')
     expect(opindex?.textContent).not.toContain('Install')
+    expect(opindex?.textContent).toContain('Detected')
+  })
+
+  it('configured wallet with isDetected: true renders the "Detected" badge', async () => {
+    const mock = makeMockManager({
+      wallets: [PHANTOM],
+      sortedWallets: [{ ...PHANTOM, isDetected: true }],
+    })
+    const wrapper = mountButton(mock.manager)
+    await wrapper.get('button').trigger('click')
+
+    const phantom = document.body.querySelector('[data-wallet-id="phantom"]')
+    expect(phantom?.textContent).toContain('Detected')
+    expect(phantom?.textContent).not.toContain('Install')
+  })
+
+  it('discovered-only wallet appears with its name + "Detected" badge', async () => {
+    const BACKPACK_DISCOVERED: WalletListEntry = {
+      id: 'backpack',
+      name: 'Backpack',
+      priority: Number.MAX_SAFE_INTEGER,
+      icon: 'data:image/svg+xml;base64,BP',
+      isDetected: true,
+      source: 'discovered',
+    }
+    const mock = makeMockManager({
+      wallets: [PHANTOM],
+      sortedWallets: [PHANTOM, BACKPACK_DISCOVERED],
+    })
+    const wrapper = mountButton(mock.manager)
+    await wrapper.get('button').trigger('click')
+
+    const backpack = document.body.querySelector('[data-wallet-id="backpack"]')
+    expect(backpack).not.toBeNull()
+    expect(backpack?.textContent).toContain('Backpack')
+    expect(backpack?.textContent).toContain('Detected')
+  })
+
+  it('non-pinned, non-detected wallet renders without any badge', async () => {
+    const mock = makeMockManager({
+      wallets: [PHANTOM],
+      sortedWallets: [PHANTOM],
+      platform: DESKTOP_NO_EXTENSION,
+    })
+    const wrapper = mountButton(mock.manager)
+    await wrapper.get('button').trigger('click')
+
+    const phantom = document.body.querySelector('[data-wallet-id="phantom"]')
+    expect(phantom?.textContent).not.toContain('Install')
+    expect(phantom?.textContent).not.toContain('Get')
+    expect(phantom?.textContent).not.toContain('Detected')
   })
 
   it('clicking a wallet calls wallet.connect() with the correct walletId', async () => {

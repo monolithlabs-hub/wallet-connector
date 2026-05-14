@@ -5,7 +5,7 @@ import {
   type PlatformInfo,
   type SolanaSignInInput,
   type SolanaSignInOutput,
-  type WalletConfig,
+  type WalletListEntry,
   type WalletError,
 } from '@monolithlabs/wallet-connect-core'
 import { computed, onMounted, onUnmounted, ref, shallowRef, type ComputedRef, type Ref } from 'vue'
@@ -20,8 +20,9 @@ import { useWalletContext } from '../context/use-wallet-context'
  * read-write state, `ComputedRef` for everything else. The composable is
  * usable in `<script setup>` and the explicit `setup()` form alike.
  *
- * The `wallet` field is this library's {@link WalletConfig} (display
- * metadata) — not wallet-adapter's `Wallet` (adapter wrapper).
+ * The `wallet` field is this library's {@link WalletListEntry} (display
+ * metadata + runtime discovery flags) — not wallet-adapter's `Wallet`
+ * (adapter wrapper).
  */
 export interface UseWalletReturn {
   /** Reactive {@link FlowState}. Read-only from the consumer's POV. */
@@ -35,9 +36,9 @@ export interface UseWalletReturn {
    */
   signature: ComputedRef<string | null>
   /** The currently-selected or in-flight wallet's metadata, or `null`. */
-  wallet: ComputedRef<WalletConfig | null>
+  wallet: ComputedRef<WalletListEntry | null>
   /** Display-ready wallet list per the platform + pinnedWallet rules. */
-  sortedWallets: ComputedRef<WalletConfig[]>
+  sortedWallets: ComputedRef<WalletListEntry[]>
   /**
    * Platform snapshot from the manager. `hasOpindexExtension` reflects
    * BOTH the legacy `window.opindex` sentinel AND the Wallet Standard
@@ -98,7 +99,7 @@ export function useWallet(): UseWalletReturn {
   // re-evaluation is explicit and symmetric with state + context.
   const state = ref<FlowState>(manager.getState())
   const context = shallowRef<FlowContext>(manager.getContext())
-  const sortedWalletsRef = shallowRef<WalletConfig[]>(manager.getSortedWallets())
+  const sortedWalletsRef = shallowRef<WalletListEntry[]>(manager.getSortedWallets())
   const platformRef = shallowRef<PlatformInfo>(manager.getPlatform())
 
   // wallet-adapter compat: track the user-selected wallet (pre-connect)
@@ -137,7 +138,7 @@ export function useWallet(): UseWalletReturn {
 
   // ---- Derived (computed) ----------------------------------------------
 
-  const sortedWallets = computed<WalletConfig[]>(() => sortedWalletsRef.value)
+  const sortedWallets = computed<WalletListEntry[]>(() => sortedWalletsRef.value)
   const platform = computed<PlatformInfo>(() => platformRef.value)
 
   const publicKey = computed<string | null>(() => context.value.publicKey)
@@ -152,7 +153,7 @@ export function useWallet(): UseWalletReturn {
       state.value === 'connected' || state.value === 'signing' || state.value === 'authenticated',
   )
 
-  const wallet = computed<WalletConfig | null>(() => {
+  const wallet = computed<WalletListEntry | null>(() => {
     const id = context.value.walletId ?? selectedWalletId.value
     if (!id) return null
     return sortedWallets.value.find((w) => w.id === id) ?? null

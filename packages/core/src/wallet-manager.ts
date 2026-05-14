@@ -20,6 +20,8 @@ import {
   type StateListener,
   type Unsubscribe,
 } from './state/machine'
+import { asWalletName } from './wallet-name'
+import { mergeWalletList, walletNameSlug, type WalletListEntry } from './wallets/list-entry'
 import { getSortedWallets, type WalletConfig } from './wallets/sorter'
 
 /**
@@ -97,8 +99,22 @@ export interface WalletManager {
    * Throws after {@link destroy}.
    */
   initialize(): void
-  /** Display-ready wallet list per the platform + pinnedWallet rules. */
-  getSortedWallets(): WalletConfig[]
+  /**
+   * Display-ready wallet list per the platform + pinnedWallet rules.
+   *
+   * Each entry carries the consumer's {@link WalletConfig} metadata plus
+   * runtime fields derived from the Wallet Standard registry: `isDetected`
+   * (drives the "Detected" badge), `source` (`'configured'` vs.
+   * `'discovered'`), and a fallback `icon` data URI from the registered
+   * wallet when the consumer didn't supply one.
+   *
+   * Wallets installed via Wallet Standard but NOT in
+   * {@link WalletManagerConfig.wallets} appear as `source: 'discovered'`
+   * entries at the end of the list — call `connect(entry.id)` on them
+   * exactly like configured wallets; the manager resolves the adapter
+   * from the registry.
+   */
+  getSortedWallets(): WalletListEntry[]
   /**
    * Initiate connect for a wallet from the config list. Auto-resets the
    * FlowMachine when called from any non-idle state, so retries after a
@@ -283,6 +299,43 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
     return config.wallets.find((w) => w.id === walletId) ?? null
   }
 
+  /**
+   * Synthesize a minimal {@link WalletConfig} for a wallet that lives only
+   * in the Wallet Standard registry (no matching entry in
+   * `config.wallets`). The slug is the lowercased / dash-normalized
+   * wallet name from {@link walletNameSlug}, so consumers calling
+   * `connect(entry.id)` on a `source: 'discovered'` {@link WalletListEntry}
+   * land here.
+   *
+   * Returns null when discovery isn't running (mobile / install-prompt
+   * strategies) or when no adapter slugs to the requested id. The deep-link
+   * fields are empty strings — never read on the `extension` strategy
+   * (the only strategy where discovery runs).
+   */
+  function buildDiscoveredWalletConfig(walletId: string): WalletConfig | null {
+    if (!discoveryHandle) return null
+    const adapter = discoveryHandle
+      .getAdapters()
+      .find((a) => walletNameSlug(a.wallet.name) === walletId)
+    if (!adapter) return null
+    return {
+      id: walletId,
+      name: adapter.wallet.name,
+      priority: Number.MAX_SAFE_INTEGER,
+      icon: adapter.wallet.icon ?? '',
+      deepLinkScheme: '',
+      universalLink: '',
+      appStoreUrl: '',
+      playStoreUrl: '',
+      standardName: asWalletName(adapter.wallet.name),
+    }
+  }
+
+  /** `findWalletConfig` with discovered-only fallback. */
+  function resolveWalletConfig(walletId: string): WalletConfig | null {
+    return findWalletConfig(walletId) ?? buildDiscoveredWalletConfig(walletId)
+  }
+
   function reportError(err: unknown): WalletError {
     const walletError =
       err instanceof WalletError
@@ -329,10 +382,12 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
   }
 
   async function doConnect(walletId: string): Promise<void> {
-    const walletConfig = findWalletConfig(walletId)
+    const walletConfig = resolveWalletConfig(walletId)
     if (!walletConfig) {
       throw reportError(
-        new WalletConnectionError(`Wallet '${walletId}' is not registered in the manager config`),
+        new WalletConnectionError(
+          `Wallet '${walletId}' is not registered in the manager config and not detected via Wallet Standard`,
+        ),
       )
     }
 
@@ -452,9 +507,11 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
     if (!ctx.walletId) {
       throw new WalletNotConnectedError('No wallet is connected')
     }
-    const walletConfig = findWalletConfig(ctx.walletId)
+    const walletConfig = resolveWalletConfig(ctx.walletId)
     if (!walletConfig) {
-      throw new WalletNotConnectedError(`Connected wallet '${ctx.walletId}' is not in the config`)
+      throw new WalletNotConnectedError(
+        `Connected wallet '${ctx.walletId}' is no longer registered`,
+      )
     }
     const adapter = findStandardAdapter(walletConfig)
     if (!adapter) {
@@ -482,7 +539,7 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
     if (platform.strategy === 'extension') {
       const ctx = machine.getContext()
       if (ctx.walletId) {
-        const walletConfig = findWalletConfig(ctx.walletId)
+        const walletConfig = resolveWalletConfig(ctx.walletId)
         if (walletConfig) {
           const adapter = findStandardAdapter(walletConfig)
           if (adapter) {
@@ -507,8 +564,23 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
 
   return {
     initialize,
-    getSortedWallets: () =>
-      getSortedWallets(config.wallets, getAugmentedPlatform(), { pinnedWalletId: pinnedWallet }),
+    getSortedWallets: () => {
+      const augmented = getAugmentedPlatform()
+      let entries = mergeWalletList(config.wallets, discoveryHandle?.getAdapters() ?? [])
+      // `mergeWalletList` only sees the Wallet Standard registry. The
+      // augmented platform also considers the legacy `window.opindex`
+      // sentinel — when that says the pinned wallet is installed but the
+      // registry doesn't have it (rare in production; real Opindex
+      // registers via Wallet Standard), reflect that as `isDetected: true`
+      // on the pinned entry so the badge renders "Detected" instead of
+      // "Install". Pure helper; doesn't mutate `entries`.
+      if (pinnedWallet && augmented.hasOpindexExtension) {
+        entries = entries.map((e) =>
+          e.id === pinnedWallet && !e.isDetected ? { ...e, isDetected: true } : e,
+        )
+      }
+      return getSortedWallets(entries, augmented, { pinnedWalletId: pinnedWallet })
+    },
     connect,
     disconnect,
     signMessage,

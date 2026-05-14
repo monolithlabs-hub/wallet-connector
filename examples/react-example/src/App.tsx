@@ -1,11 +1,29 @@
-import type { WalletConfig, WalletManagerConfig } from '@monolithlabs/wallet-connect-core'
+import {
+  asWalletName,
+  type WalletConfig,
+  type WalletManagerConfig,
+} from '@monolithlabs/wallet-connect-core'
 import { ConnectButton, WalletConnectProvider } from '@monolithlabs/wallet-connect-react'
+
+// Inline "O" badge for Opindex — Opindex isn't a Wallet Standard wallet, so
+// the merge can't auto-fill its icon from the registry. Phantom/Solflare
+// omit `icon` entirely and pick up their data-URI icons from the Wallet
+// Standard registration at runtime.
+const OPINDEX_ICON =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">' +
+      '<circle cx="20" cy="20" r="20" fill="#111"/>' +
+      '<text x="50%" y="55%" font-size="20" fill="#fff" text-anchor="middle" ' +
+      'dominant-baseline="middle" font-family="system-ui" font-weight="bold">O</text>' +
+      '</svg>',
+  )
 
 const OPINDEX: WalletConfig = {
   id: 'opindex',
   name: 'Opindex',
   priority: 10,
-  icon: '',
+  icon: OPINDEX_ICON,
   deepLinkScheme: 'opindex://',
   universalLink: 'https://opindex.app/ul/v1/connect',
   appStoreUrl: 'https://apps.apple.com/app/opindex',
@@ -16,7 +34,11 @@ const PHANTOM: WalletConfig = {
   id: 'phantom',
   name: 'Phantom',
   priority: 1,
+  // icon omitted: filled in by the Wallet Standard registry when the
+  // Phantom extension is installed. The fallback initial-letter avatar
+  // renders if not.
   icon: '',
+  standardName: asWalletName('Phantom'),
   deepLinkScheme: 'phantom://',
   universalLink: 'https://phantom.app/ul/v1/connect',
   appStoreUrl: 'https://apps.apple.com/app/phantom-crypto-wallet/id1598432977',
@@ -28,6 +50,7 @@ const SOLFLARE: WalletConfig = {
   name: 'Solflare',
   priority: 2,
   icon: '',
+  standardName: asWalletName('Solflare'),
   deepLinkScheme: 'solflare://',
   universalLink: 'https://solflare.com/ul/v1/connect',
   appStoreUrl: 'https://apps.apple.com/app/solflare/id1580902717',

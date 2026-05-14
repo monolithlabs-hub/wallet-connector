@@ -2,20 +2,23 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { PlatformInfo } from '../platform/detector'
 
-import { type WalletConfig, getSortedWallets } from './sorter'
+import type { WalletListEntry } from './list-entry'
+import { getSortedWallets } from './sorter'
 
 const stubMeta = {
   icon: '',
+  isDetected: false,
+  source: 'configured',
   deepLinkScheme: '',
   universalLink: '',
   appStoreUrl: '',
   playStoreUrl: '',
 } as const
 
-const opindex: WalletConfig = { id: 'opindex', name: 'Opindex', priority: 10, ...stubMeta }
-const phantom: WalletConfig = { id: 'phantom', name: 'Phantom', priority: 1, ...stubMeta }
-const solflare: WalletConfig = { id: 'solflare', name: 'Solflare', priority: 2, ...stubMeta }
-const backpack: WalletConfig = { id: 'backpack', name: 'Backpack', priority: 3, ...stubMeta }
+const opindex: WalletListEntry = { id: 'opindex', name: 'Opindex', priority: 10, ...stubMeta }
+const phantom: WalletListEntry = { id: 'phantom', name: 'Phantom', priority: 1, ...stubMeta }
+const solflare: WalletListEntry = { id: 'solflare', name: 'Solflare', priority: 2, ...stubMeta }
+const backpack: WalletListEntry = { id: 'backpack', name: 'Backpack', priority: 3, ...stubMeta }
 
 const MOBILE: PlatformInfo = {
   isMobile: true,
@@ -42,7 +45,7 @@ const DESKTOP_NO_EXT: PlatformInfo = {
   strategy: 'install-prompt',
 }
 
-const ids = (wallets: WalletConfig[]): string[] => wallets.map((w) => w.id)
+const ids = (wallets: WalletListEntry[]): string[] => wallets.map((w) => w.id)
 
 describe('getSortedWallets', () => {
   afterEach(() => {
@@ -94,7 +97,7 @@ describe('getSortedWallets', () => {
   })
 
   it('does not mutate the input array', () => {
-    const input: WalletConfig[] = [phantom, solflare, opindex, backpack]
+    const input: WalletListEntry[] = [phantom, solflare, opindex, backpack]
     const snapshot = [...input]
 
     getSortedWallets(input, MOBILE)

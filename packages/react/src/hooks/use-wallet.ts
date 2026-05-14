@@ -5,8 +5,8 @@ import {
   type PlatformInfo,
   type SolanaSignInInput,
   type SolanaSignInOutput,
-  type WalletConfig,
   type WalletError,
+  type WalletListEntry,
   type WalletManager,
   type WalletManagerConfig,
 } from '@monolithlabs/wallet-connect-core'
@@ -20,8 +20,9 @@ import { WalletConnectContext } from '../context/wallet-connect-context'
  * The first half of the fields mirror `@solana/wallet-adapter-react`'s
  * `WalletContextState` so a consumer migrating from that package only has
  * to change their import path. `wallet` here is this library's
- * {@link WalletConfig} (display metadata) — not wallet-adapter's `Wallet`
- * (adapter wrapper); the field name matches but the shape differs slightly.
+ * {@link WalletListEntry} (display metadata + runtime discovery flags) —
+ * not wallet-adapter's `Wallet` (adapter wrapper); the field name matches
+ * but the shape differs slightly.
  *
  * The second half (`state`, `sortedWallets`, `is*`, `error`) are this
  * library's additions — richer state machine view + a display-ready wallet
@@ -29,7 +30,7 @@ import { WalletConnectContext } from '../context/wallet-connect-context'
  */
 export interface UseWalletReturn {
   // --- wallet-adapter-react compat ---------------------------------------
-  wallet: WalletConfig | null
+  wallet: WalletListEntry | null
   publicKey: string | null
   connecting: boolean
   connected: boolean
@@ -49,7 +50,7 @@ export interface UseWalletReturn {
 
   // --- project-specific additions ----------------------------------------
   state: FlowState
-  sortedWallets: WalletConfig[]
+  sortedWallets: WalletListEntry[]
   /**
    * Platform snapshot from the manager. `hasOpindexExtension` reflects
    * BOTH the legacy `window.opindex` sentinel AND the Wallet Standard
@@ -171,7 +172,7 @@ export function useWallet(config?: WalletManagerConfig): UseWalletReturn {
   // `useMemo` here would never hit. The `.find` over a handful of
   // wallets is cheap.
   const activeWalletId = context.walletId ?? selectedWalletId
-  const wallet: WalletConfig | null =
+  const wallet: WalletListEntry | null =
     activeWalletId !== null ? (sortedWallets.find((w) => w.id === activeWalletId) ?? null) : null
 
   const select = useCallback((walletId: string) => {

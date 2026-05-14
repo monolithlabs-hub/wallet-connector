@@ -3,7 +3,7 @@ import {
   WalletConnectionError,
   type FlowMachine,
   type PlatformInfo,
-  type WalletConfig,
+  type WalletListEntry,
   type WalletManager,
 } from '@monolithlabs/wallet-connect-core'
 import { act, renderHook } from '@testing-library/react'
@@ -14,22 +14,26 @@ import { WalletConnectContext } from '../context/wallet-connect-context'
 
 import { useWallet } from './use-wallet'
 
-const PHANTOM: WalletConfig = {
+const PHANTOM: WalletListEntry = {
   id: 'phantom',
   name: 'Phantom',
   priority: 1,
   icon: '',
+  isDetected: false,
+  source: 'configured',
   deepLinkScheme: 'phantom://',
   universalLink: 'https://phantom.app/ul/v1/connect',
   appStoreUrl: '',
   playStoreUrl: '',
 }
 
-const SOLFLARE: WalletConfig = {
+const SOLFLARE: WalletListEntry = {
   id: 'solflare',
   name: 'Solflare',
   priority: 2,
   icon: '',
+  isDetected: false,
+  source: 'configured',
   deepLinkScheme: 'solflare://',
   universalLink: 'https://solflare.com/ul/v1/connect',
   appStoreUrl: '',
@@ -60,7 +64,7 @@ interface MockManager {
   notifyRegistryChange(): void
 }
 
-function makeMockManager(wallets: WalletConfig[] = [PHANTOM, SOLFLARE]): MockManager {
+function makeMockManager(wallets: WalletListEntry[] = [PHANTOM, SOLFLARE]): MockManager {
   const machine = createFlowMachine()
   const initializeSpy = vi.fn()
   const connectSpy = vi.fn(async () => undefined)

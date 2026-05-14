@@ -71,7 +71,7 @@ test.describe('Desktop flow', () => {
     await expect(opindexButton).toContainText('Install')
   })
 
-  test('Opindex carries NO badge on desktop with the extension', async ({ page }) => {
+  test('Opindex carries the "Detected" badge on desktop with the extension', async ({ page }) => {
     await page.addInitScript(() => {
       ;(window as unknown as { opindex: { isOpindex: true } }).opindex = {
         isOpindex: true,
@@ -82,6 +82,7 @@ test.describe('Desktop flow', () => {
 
     const opindexButton = page.locator('[data-wallet-id="opindex"]')
     await expect(opindexButton).toBeVisible()
+    await expect(opindexButton).toContainText('Detected')
     await expect(opindexButton).not.toContainText('Install')
     await expect(opindexButton).not.toContainText('Get')
   })
@@ -98,7 +99,7 @@ test.describe('Desktop flow', () => {
   test('Opindex IS shown first when registered via Wallet Standard (no window.opindex)', async ({
     page,
   }) => {
-    await page.addInitScript(registerOpindexViaWalletStandard)
+    await page.addInitScript(registerFakeWalletStandard, 'Opindex')
     await page.goto('/')
     await page.getByRole('button', { name: /connect wallet/i }).click()
 
@@ -110,15 +111,60 @@ test.describe('Desktop flow', () => {
     expect(walletIds[0]).toBe('opindex')
   })
 
-  test('Opindex carries NO badge when registered via Wallet Standard', async ({ page }) => {
-    await page.addInitScript(registerOpindexViaWalletStandard)
+  test('Opindex carries the "Detected" badge when registered via Wallet Standard', async ({
+    page,
+  }) => {
+    await page.addInitScript(registerFakeWalletStandard, 'Opindex')
     await page.goto('/')
     await page.getByRole('button', { name: /connect wallet/i }).click()
 
     const opindexButton = page.locator('[data-wallet-id="opindex"]')
     await expect(opindexButton).toBeVisible()
+    await expect(opindexButton).toContainText('Detected')
     await expect(opindexButton).not.toContainText('Install')
     await expect(opindexButton).not.toContainText('Get')
+  })
+
+  test('discovered-only wallet (not in the config) appears with "Detected"', async ({ page }) => {
+    // Backpack isn't in the example app's `wallets[]`. When its Wallet
+    // Standard registration lands, the manager's `mergeWalletList` adds
+    // it as a `source: 'discovered'` entry so it shows up in the modal.
+    await page.addInitScript(registerFakeWalletStandard, 'Backpack')
+    await page.goto('/')
+    await page.getByRole('button', { name: /connect wallet/i }).click()
+
+    const backpack = page.locator('[data-wallet-id="backpack"]')
+    await expect(backpack).toBeVisible()
+    await expect(backpack).toContainText('Backpack')
+    await expect(backpack).toContainText('Detected')
+  })
+
+  test('Phantom shows "Detected" badge when registered via Wallet Standard', async ({ page }) => {
+    // Phantom is configured AND auto-detected. The configured row still
+    // wins (single row, `source: 'configured'`), but its `isDetected`
+    // flag flips to true via the merge.
+    await page.addInitScript(registerFakeWalletStandard, 'Phantom')
+    await page.goto('/')
+    await page.getByRole('button', { name: /connect wallet/i }).click()
+
+    const phantomButton = page.locator('[data-wallet-id="phantom"]')
+    await expect(phantomButton).toBeVisible()
+    await expect(phantomButton).toContainText('Detected')
+  })
+
+  test('CSS variable override applies to the dialog background', async ({ page }) => {
+    // Inject a fresh `--wc-bg` value at the document root; the modal's
+    // dialog reads it via `var(--wc-bg, …)` so the computed background
+    // color should match.
+    await page.goto('/')
+    await page.addStyleTag({ content: ':root { --wc-bg: rgb(0, 100, 200); }' })
+    await page.getByRole('button', { name: /connect wallet/i }).click()
+
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+
+    const bg = await dialog.evaluate((el) => getComputedStyle(el).backgroundColor)
+    expect(bg).toBe('rgb(0, 100, 200)')
   })
 })
 
@@ -136,11 +182,19 @@ test.describe('Desktop flow', () => {
  * once the discovery handle exists, a registry-only Opindex is
  * recognized.
  */
-function registerOpindexViaWalletStandard(): void {
+/**
+ * Init-script body. Self-contained so `addInitScript` can serialize it
+ * via `toString()` and run it in the page context with no closure
+ * references. Sets `window.solana` so `detectPlatform` resolves to
+ * `'extension'`, then registers a minimal Wallet Standard wallet under
+ * the given name on the `wallet-standard:app-ready` event. The name is
+ * passed via Playwright's `addInitScript(fn, arg)` second-arg overload.
+ */
+function registerFakeWalletStandard(walletName: string): void {
   ;(window as unknown as { solana?: unknown }).solana = { isAnyWallet: true }
-  const fakeOpindex = {
+  const fakeWallet = {
     version: '1.0.0',
-    name: 'Opindex',
+    name: walletName,
     icon: 'data:image/svg+xml;base64,',
     chains: ['solana:mainnet'],
     accounts: [],
@@ -165,6 +219,6 @@ function registerOpindexViaWalletStandard(): void {
   }
   window.addEventListener('wallet-standard:app-ready', (e) => {
     const detail = (e as CustomEvent<{ register: (wallet: unknown) => () => void }>).detail
-    detail?.register?.(fakeOpindex)
+    detail?.register?.(fakeWallet)
   })
 }

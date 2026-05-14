@@ -1,13 +1,16 @@
 import {
   type FlowState,
   type PlatformInfo,
-  type WalletConfig,
+  type WalletListEntry,
 } from '@monolithlabs/wallet-connect-core'
 import {
   attachModal,
   getDialogAttributes,
-  getInstallBadge,
+  getStatusBadge,
+  getWalletStatus,
   truncatePublicKey,
+  type StatusBadge,
+  type WalletStatus,
 } from '@monolithlabs/wallet-connect-ui'
 import {
   useCallback,
@@ -56,16 +59,29 @@ function isFlowStateConnected(state: FlowState): boolean {
 }
 
 /**
- * Compute whether the pinned-wallet badge should render for `wallet`.
+ * Per-row badge decision. The wallet-list never renders the connected
+ * row (the parent swaps to ConnectedView on `isConnected`), so the
+ * `connected` status branch is unreachable here — left in for clarity.
  *
- * Mobile: always show (iOS can't probe for installed apps).
- * Desktop with the extension detected: hide.
- * Desktop without the extension: show with the "Install" badge.
+ * Returns `null` to suppress the badge entirely for non-pinned wallets
+ * that aren't detected (those rows render as plain rows with no prompt).
+ * The pinned wallet always carries either a "Detected" or "Get"/"Install"
+ * badge depending on whether its extension is registered.
  */
-function shouldShowInstallBadge(wallet: WalletConfig, platform: PlatformInfo): boolean {
-  if (wallet.id !== PINNED_WALLET_ID) return false
-  if (platform.isMobile) return true
-  return !platform.hasOpindexExtension
+function badgeForRow(wallet: WalletListEntry, platform: PlatformInfo): StatusBadge | null {
+  const status: WalletStatus = getWalletStatus({
+    isConnected: false,
+    isDetected: wallet.isDetected,
+  })
+  const effective = status === 'install' && wallet.id !== PINNED_WALLET_ID ? null : status
+  if (effective === null) return null
+  return getStatusBadge({ status: effective, isIOS: platform.isIOS })
+}
+
+function initialFor(name: string): string {
+  const trimmed = name.trim()
+  if (trimmed.length === 0) return '?'
+  return trimmed.charAt(0).toUpperCase()
 }
 
 /**
@@ -247,7 +263,12 @@ function WalletModal({ titleId, title, onClose, children }: WalletModalProps): R
         if (e.target === e.currentTarget) onCloseRef.current()
       }}
     >
-      <div ref={dialogRef} {...getDialogAttributes(titleId)} style={modalContentStyle}>
+      <div
+        ref={dialogRef}
+        {...getDialogAttributes(titleId)}
+        data-wc-modal=""
+        style={modalContentStyle}
+      >
         <header style={modalHeaderStyle}>
           <h2 id={titleId} style={modalTitleStyle}>
             {title}
@@ -256,6 +277,7 @@ function WalletModal({ titleId, title, onClose, children }: WalletModalProps): R
             type="button"
             onClick={() => onCloseRef.current()}
             aria-label="Close"
+            data-wc-modal-close=""
             style={modalCloseButtonStyle}
           >
             {'×'}
@@ -268,7 +290,7 @@ function WalletModal({ titleId, title, onClose, children }: WalletModalProps): R
 }
 
 interface WalletListProps {
-  wallets: readonly WalletConfig[]
+  wallets: readonly WalletListEntry[]
   platform: PlatformInfo
   state: FlowState
   connectingWalletId: string | null
@@ -290,28 +312,32 @@ function WalletList({
   return (
     <ul role="list" style={walletListStyle}>
       {wallets.map((wallet) => {
-        const badge = getInstallBadge({
-          shouldShow: shouldShowInstallBadge(wallet, platform),
-          isIOS: platform.isIOS,
-        })
+        const badge = badgeForRow(wallet, platform)
         const isConnecting = state === 'connecting' && connectingWalletId === wallet.id
         return (
           <li key={wallet.id} style={{ margin: 0 }}>
             <button
               type="button"
               data-wallet-id={wallet.id}
+              data-wc-wallet-item=""
               onClick={() => onSelect(wallet.id)}
               disabled={state === 'connecting' || state === 'signing'}
               style={walletItemButtonStyle}
             >
               {wallet.icon ? (
-                <img src={wallet.icon} alt="" width={24} height={24} style={{ borderRadius: 4 }} />
+                <img src={wallet.icon} alt="" width={24} height={24} style={walletIconStyle} />
               ) : (
-                <span aria-hidden="true" style={walletIconPlaceholderStyle} />
+                <span aria-hidden="true" style={walletIconFallbackStyle}>
+                  {initialFor(wallet.name)}
+                </span>
               )}
               <span style={{ flex: 1, textAlign: 'left' }}>{wallet.name}</span>
               {isConnecting ? <span style={walletStatusStyle}>Connecting…</span> : null}
-              {badge ? <span style={walletBadgeStyle}>{badge}</span> : null}
+              {badge ? (
+                <span style={badge === 'Detected' ? walletDetectedBadgeStyle : walletBadgeStyle}>
+                  {badge}
+                </span>
+              ) : null}
             </button>
           </li>
         )
@@ -355,15 +381,18 @@ function ConnectedView({
 }
 
 // ---------------------------------------------------------------------------
-// Minimal inline default styling. Consumers can override via className /
-// style on the root button and via CSS targeting the standard ARIA selectors
-// (`[role="dialog"]`, etc.) for the modal.
+// Default styling. Every visual value reads from a CSS custom property
+// (e.g., `var(--wc-bg, #fff)`) so consumers can theme by setting variables
+// on `[role="dialog"]`, on `[data-wc-modal]`, on a parent element, or on
+// `:root`. The `@monolithlabs/wallet-connect-ui` package injects a small
+// stylesheet with the variable defaults plus hover / focus-visible / disabled
+// rules (which can't be expressed via inline `style`).
 // ---------------------------------------------------------------------------
 
 const modalBackdropStyle: CSSProperties = {
   position: 'fixed',
   inset: 0,
-  background: 'rgba(0, 0, 0, 0.5)',
+  background: 'var(--wc-backdrop, rgba(0, 0, 0, 0.5))',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -371,25 +400,30 @@ const modalBackdropStyle: CSSProperties = {
 }
 
 const modalContentStyle: CSSProperties = {
-  background: '#fff',
-  color: '#111',
-  borderRadius: 12,
+  background: 'var(--wc-bg, #fff)',
+  color: 'var(--wc-fg, #111)',
+  borderRadius: 'var(--wc-radius, 12px)',
   minWidth: 320,
   maxWidth: 'min(420px, calc(100vw - 32px))',
   maxHeight: 'calc(100vh - 32px)',
   overflow: 'auto',
-  boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+  boxShadow: 'var(--wc-shadow, 0 20px 40px rgba(0, 0, 0, 0.3))',
 }
 
 const modalHeaderStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  padding: '12px 16px',
-  borderBottom: '1px solid rgba(0,0,0,0.08)',
+  padding: '14px 18px',
+  borderBottom: '1px solid var(--wc-border, rgba(0, 0, 0, 0.08))',
 }
 
-const modalTitleStyle: CSSProperties = { margin: 0, fontSize: 18 }
+const modalTitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: 'var(--wc-title-size, 18px)',
+  fontWeight: 600,
+  letterSpacing: '-0.01em',
+}
 
 const modalCloseButtonStyle: CSSProperties = {
   background: 'transparent',
@@ -397,7 +431,9 @@ const modalCloseButtonStyle: CSSProperties = {
   fontSize: 22,
   lineHeight: 1,
   cursor: 'pointer',
-  padding: 4,
+  padding: 6,
+  borderRadius: 'var(--wc-radius-item, 8px)',
+  color: 'var(--wc-muted-fg, rgba(0, 0, 0, 0.6))',
 }
 
 const walletListStyle: CSSProperties = {
@@ -406,7 +442,7 @@ const walletListStyle: CSSProperties = {
   padding: 8,
   display: 'flex',
   flexDirection: 'column',
-  gap: 4,
+  gap: 2,
 }
 
 const walletItemButtonStyle: CSSProperties = {
@@ -416,19 +452,32 @@ const walletItemButtonStyle: CSSProperties = {
   width: '100%',
   padding: '10px 12px',
   background: 'transparent',
-  border: '1px solid transparent',
-  borderRadius: 8,
+  border: 'none',
+  borderRadius: 'var(--wc-radius-item, 8px)',
   cursor: 'pointer',
   font: 'inherit',
   color: 'inherit',
+  textAlign: 'left',
 }
 
-const walletIconPlaceholderStyle: CSSProperties = {
-  display: 'inline-block',
+const walletIconStyle: CSSProperties = {
+  borderRadius: 6,
+  display: 'block',
+  flexShrink: 0,
+}
+
+const walletIconFallbackStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
   width: 24,
   height: 24,
-  borderRadius: 4,
-  background: 'rgba(0,0,0,0.08)',
+  borderRadius: 6,
+  background: 'var(--wc-badge-bg, rgba(0, 0, 0, 0.08))',
+  color: 'var(--wc-muted-fg, rgba(0, 0, 0, 0.6))',
+  fontSize: 12,
+  fontWeight: 600,
+  flexShrink: 0,
 }
 
 const walletBadgeStyle: CSSProperties = {
@@ -436,29 +485,37 @@ const walletBadgeStyle: CSSProperties = {
   fontWeight: 600,
   padding: '2px 8px',
   borderRadius: 999,
-  background: 'rgba(0,0,0,0.08)',
+  background: 'var(--wc-badge-bg, rgba(0, 0, 0, 0.08))',
+  color: 'var(--wc-badge-fg, inherit)',
+}
+
+const walletDetectedBadgeStyle: CSSProperties = {
+  ...walletBadgeStyle,
+  background: 'var(--wc-detected-bg, rgba(34, 197, 94, 0.12))',
+  color: 'var(--wc-detected-fg, rgb(21, 128, 61))',
 }
 
 const walletStatusStyle: CSSProperties = {
   fontSize: 12,
-  color: 'rgba(0,0,0,0.6)',
+  color: 'var(--wc-muted-fg, rgba(0, 0, 0, 0.6))',
 }
 
 const errorRowStyle: CSSProperties = {
   margin: '8px 12px 0',
   padding: '8px 12px',
-  borderRadius: 8,
-  background: 'rgba(220, 38, 38, 0.08)',
-  color: 'rgb(185, 28, 28)',
+  borderRadius: 'var(--wc-radius-item, 8px)',
+  background: 'var(--wc-error-bg, rgba(220, 38, 38, 0.08))',
+  color: 'var(--wc-error-fg, rgb(185, 28, 28))',
   fontSize: 13,
 }
 
 const disconnectButtonStyle: CSSProperties = {
-  padding: '8px 12px',
-  border: '1px solid rgba(0,0,0,0.12)',
-  borderRadius: 8,
+  padding: '10px 14px',
+  border: '1px solid var(--wc-border, rgba(0, 0, 0, 0.12))',
+  borderRadius: 'var(--wc-radius-item, 8px)',
   background: 'transparent',
   cursor: 'pointer',
   font: 'inherit',
   color: 'inherit',
+  fontWeight: 500,
 }
