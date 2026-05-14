@@ -2,7 +2,7 @@
   "name": "wallet-connector",
   "version": "0.0.0",
   "private": true,
-  "description": "Solana wallet-connect monorepo (@monolithlabs/wallet-connect)",
+  "description": "Solana wallet-connect monorepo (@monolithlabs-hub/wallet-connect)",
   "packageManager": "pnpm@11.0.8",
   "engines": {
     "node": ">=22.13"
@@ -17,7 +17,7 @@
     "docs:link-check": "node scripts/check-md-links.mjs",
     "readme:check": "node scripts/check-readme-typescript.mjs",
     "changeset": "changeset",
-    "e2e": "pnpm turbo build --filter=@monolithlabs/wallet-connect-react-example... && playwright test",
+    "e2e": "pnpm turbo build --filter=@monolithlabs-hub/wallet-connect-react-example... && playwright test",
     "e2e:install": "playwright install --with-deps chromium firefox webkit",
     "prepare": "husky"
   },

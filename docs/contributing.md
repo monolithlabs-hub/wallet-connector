@@ -8,10 +8,10 @@ This is a pnpm + Turborepo monorepo.
 
 ```
 packages/
-  core/   @monolithlabs/wallet-connect-core   — framework-agnostic logic
-  ui/     @monolithlabs/wallet-connect-ui     — headless modal/list primitives
-  react/  @monolithlabs/wallet-connect-react  — useWallet() + <ConnectButton>
-  vue/    @monolithlabs/wallet-connect-vue    — composable + ConnectButton.vue
+  core/   @monolithlabs-hub/wallet-connect-core   — framework-agnostic logic
+  ui/     @monolithlabs-hub/wallet-connect-ui     — headless modal/list primitives
+  react/  @monolithlabs-hub/wallet-connect-react  — useWallet() + <ConnectButton>
+  vue/    @monolithlabs-hub/wallet-connect-vue    — composable + ConnectButton.vue
 examples/
   vue-example/                                — Vite + Vue 3 demo app (TASK-602)
 docs/                                         — you are here

@@ -1,4 +1,4 @@
-import { asWalletName, type WalletConfig } from '@monolithlabs/wallet-connect-core'
+import { asWalletName, type WalletConfig } from '@monolithlabs-hub/wallet-connect-core'
 
 // Inline "O" badge for Opindex — Opindex isn't a Wallet Standard wallet,
 // so any auto-merge / discovery cannot fill its icon from the registry.

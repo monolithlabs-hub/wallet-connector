@@ -6,7 +6,7 @@
 //
 // The published types are still useful: `default` is typed as
 // `DefineComponent`, which lets consumers do
-// `import { ConnectButton } from '@monolithlabs/wallet-connect-vue'` and
+// `import { ConnectButton } from '@monolithlabs-hub/wallet-connect-vue'` and
 // drop the component into a template. Granular prop / event types are
 // available when the consumer's IDE / project runs `vue-tsc`.
 declare module '*.vue' {

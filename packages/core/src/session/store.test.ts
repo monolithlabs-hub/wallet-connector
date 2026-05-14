@@ -59,7 +59,7 @@ describe('SessionStore', () => {
 
     getPendingState()
 
-    expect(sessionStorage.getItem('@monolithlabs/wc:pendingState')).toBeNull()
+    expect(sessionStorage.getItem('@monolithlabs-hub/wc:pendingState')).toBeNull()
   })
 
   it('clearPendingState removes state', () => {
@@ -153,7 +153,7 @@ describe('SessionStore', () => {
   })
 
   it('returns null on corrupt JSON in sessionStorage', () => {
-    sessionStorage.setItem('@monolithlabs/wc:pendingState', '{ not json')
+    sessionStorage.setItem('@monolithlabs-hub/wc:pendingState', '{ not json')
 
     expect(getPendingState()).toBeNull()
   })
@@ -162,7 +162,7 @@ describe('SessionStore', () => {
     // walletId is a number instead of a string — would slip past a plain
     // JSON.parse + `as PendingState` cast and explode downstream.
     sessionStorage.setItem(
-      '@monolithlabs/wc:pendingState',
+      '@monolithlabs-hub/wc:pendingState',
       JSON.stringify({
         walletId: 42,
         requireSignIn: false,
@@ -173,12 +173,12 @@ describe('SessionStore', () => {
     )
 
     expect(getPendingState()).toBeNull()
-    expect(sessionStorage.getItem('@monolithlabs/wc:pendingState')).toBeNull()
+    expect(sessionStorage.getItem('@monolithlabs-hub/wc:pendingState')).toBeNull()
   })
 
   it('returns null and clears the entry when a required field is missing', () => {
     sessionStorage.setItem(
-      '@monolithlabs/wc:pendingState',
+      '@monolithlabs-hub/wc:pendingState',
       JSON.stringify({
         walletId: 'phantom',
         requireSignIn: false,
@@ -189,18 +189,18 @@ describe('SessionStore', () => {
     )
 
     expect(getPendingState()).toBeNull()
-    expect(sessionStorage.getItem('@monolithlabs/wc:pendingState')).toBeNull()
+    expect(sessionStorage.getItem('@monolithlabs-hub/wc:pendingState')).toBeNull()
   })
 
   it('returns null when the persisted value is not an object', () => {
-    sessionStorage.setItem('@monolithlabs/wc:pendingState', JSON.stringify('not-an-object'))
+    sessionStorage.setItem('@monolithlabs-hub/wc:pendingState', JSON.stringify('not-an-object'))
 
     expect(getPendingState()).toBeNull()
   })
 
   it('rejects records whose optional signInMessage is the wrong type', () => {
     sessionStorage.setItem(
-      '@monolithlabs/wc:pendingState',
+      '@monolithlabs-hub/wc:pendingState',
       JSON.stringify({
         walletId: 'phantom',
         requireSignIn: true,

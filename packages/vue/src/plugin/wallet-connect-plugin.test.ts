@@ -3,7 +3,7 @@ import {
   type FlowMachine,
   type WalletManager,
   type WalletManagerConfig,
-} from '@monolithlabs/wallet-connect-core'
+} from '@monolithlabs-hub/wallet-connect-core'
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp, defineComponent, h, type App } from 'vue'
@@ -19,9 +19,9 @@ const mocks = vi.hoisted(() => ({
   createWalletManager: vi.fn(),
 }))
 
-vi.mock('@monolithlabs/wallet-connect-core', async () => {
-  const actual = await vi.importActual<typeof import('@monolithlabs/wallet-connect-core')>(
-    '@monolithlabs/wallet-connect-core',
+vi.mock('@monolithlabs-hub/wallet-connect-core', async () => {
+  const actual = await vi.importActual<typeof import('@monolithlabs-hub/wallet-connect-core')>(
+    '@monolithlabs-hub/wallet-connect-core',
   )
   return {
     ...actual,

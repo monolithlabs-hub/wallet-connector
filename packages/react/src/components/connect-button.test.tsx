@@ -5,7 +5,7 @@ import {
   type PlatformInfo,
   type WalletListEntry,
   type WalletManager,
-} from '@monolithlabs/wallet-connect-core'
+} from '@monolithlabs-hub/wallet-connect-core'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { type ReactNode } from 'react'

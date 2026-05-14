@@ -2,7 +2,7 @@ import {
   createWalletManager,
   type WalletManager,
   type WalletManagerConfig,
-} from '@monolithlabs/wallet-connect-core'
+} from '@monolithlabs-hub/wallet-connect-core'
 import type { Plugin } from 'vue'
 
 import { WalletConnectInjectionKey } from '../context/injection-key'
@@ -18,7 +18,7 @@ import { WalletConnectInjectionKey } from '../context/injection-key'
  *
  * ```ts
  * import { createApp } from 'vue'
- * import { WalletConnectPlugin } from '@monolithlabs/wallet-connect-vue'
+ * import { WalletConnectPlugin } from '@monolithlabs-hub/wallet-connect-vue'
  *
  * const app = createApp(App)
  * app.use(WalletConnectPlugin, {

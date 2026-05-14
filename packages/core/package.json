@@ -1,7 +1,31 @@
 {
-  "name": "@monolithlabs/wallet-connect-core",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@monolithlabs-hub/wallet-connect-core",
+  "version": "1.0.0",
+  "description": "Framework-agnostic Solana wallet-connect core: platform detection, deep-link orchestration, callback decryption, and SIWS bundling.",
+  "keywords": [
+    "solana",
+    "wallet",
+    "wallet-connect",
+    "wallet-standard",
+    "sign-in-with-solana",
+    "siws",
+    "phantom",
+    "solflare",
+    "backpack",
+    "deep-link",
+    "web3"
+  ],
+  "homepage": "https://github.com/monolithlabs-hub/wallet-connector#readme",
+  "bugs": {
+    "url": "https://github.com/monolithlabs-hub/wallet-connector/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/monolithlabs-hub/wallet-connector.git",
+    "directory": "packages/core"
+  },
+  "license": "MIT",
+  "author": "Monolith Labs",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -20,16 +44,24 @@
   },
   "files": [
     "dist",
+    "LICENSE",
     "NOTICE",
     "THIRD_PARTY_LICENSES.md"
   ],
   "sideEffects": false,
+  "engines": {
+    "node": ">=18.18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "build": "tsup",
     "test": "vitest run --coverage",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "prepack": "cp ../../NOTICE ../../THIRD_PARTY_LICENSES.md ."
+    "prepack": "cp ../../LICENSE ../../NOTICE ../../THIRD_PARTY_LICENSES.md ."
   },
   "dependencies": {
     "@solana/wallet-standard-features": "^1.3.0",

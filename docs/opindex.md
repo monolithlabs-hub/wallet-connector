@@ -40,7 +40,7 @@ We chose to make this transparent rather than hidden because:
 ## The disable knob
 
 ```ts
-import type { WalletManagerConfig } from '@monolithlabs/wallet-connect-core'
+import type { WalletManagerConfig } from '@monolithlabs-hub/wallet-connect-core'
 
 const config: WalletManagerConfig = {
   wallets: [PHANTOM, SOLFLARE, BACKPACK],
@@ -91,6 +91,6 @@ If you build a wallet aggregator or a competing dapp, you may understandably fee
 
 - Defaulting to no pin (`null`) would mean every Monolith Labs property has to remember to opt back in. Easy to forget; cosmetic but annoying.
 - Hiding the pin behind an undocumented option would be worse than this page.
-- Splitting into two packages (`@monolithlabs/wallet-connect-react` and `@monolithlabs/opindex-pin`) is an option for a future major if community pressure makes the bundled pin untenable.
+- Splitting into two packages (`@monolithlabs-hub/wallet-connect-react` and `@monolithlabs-hub/opindex-pin`) is an option for a future major if community pressure makes the bundled pin untenable.
 
 For now: the default is a pin, the disable is one line, and this page is in the public docs.

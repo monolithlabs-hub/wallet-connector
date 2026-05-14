@@ -1,7 +1,29 @@
 {
-  "name": "@monolithlabs/wallet-connect-ui",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@monolithlabs-hub/wallet-connect-ui",
+  "version": "1.0.0",
+  "description": "Headless UI primitives for @monolithlabs-hub/wallet-connect: framework-agnostic modal lifecycle, focus trap, and wallet-list rendering helpers.",
+  "keywords": [
+    "solana",
+    "wallet",
+    "wallet-connect",
+    "headless-ui",
+    "modal",
+    "focus-trap",
+    "accessibility",
+    "siws",
+    "web3"
+  ],
+  "homepage": "https://github.com/monolithlabs-hub/wallet-connector#readme",
+  "bugs": {
+    "url": "https://github.com/monolithlabs-hub/wallet-connector/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/monolithlabs-hub/wallet-connector.git",
+    "directory": "packages/ui"
+  },
+  "license": "MIT",
+  "author": "Monolith Labs",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -19,14 +41,23 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE"
   ],
   "sideEffects": false,
+  "engines": {
+    "node": ">=18.18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "build": "tsup",
     "test": "vitest run --coverage",
     "lint": "eslint . --max-warnings=0",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "prepack": "cp ../../LICENSE ."
   },
   "dependencies": {}
 }

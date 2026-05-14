@@ -32,7 +32,7 @@ export interface PendingState {
   ephemeralSecretKey: string
 }
 
-const PENDING_KEY = '@monolithlabs/wc:pendingState'
+const PENDING_KEY = '@monolithlabs-hub/wc:pendingState'
 const LAST_USED_KEY = 'lastUsedWallet'
 const STALE_AFTER_MS = 10 * 60 * 1000
 

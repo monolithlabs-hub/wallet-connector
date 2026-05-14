@@ -1,5 +1,5 @@
 {
-  "name": "@monolithlabs/wallet-connect-react-example",
+  "name": "@monolithlabs-hub/wallet-connect-react-example",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,8 +9,8 @@
     "preview": "vite preview --port 4173 --strictPort"
   },
   "dependencies": {
-    "@monolithlabs/wallet-connect-core": "workspace:*",
-    "@monolithlabs/wallet-connect-react": "workspace:*",
+    "@monolithlabs-hub/wallet-connect-core": "workspace:*",
+    "@monolithlabs-hub/wallet-connect-react": "workspace:*",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },

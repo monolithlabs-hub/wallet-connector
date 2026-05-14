@@ -5,9 +5,9 @@
   "fixed": [],
   "linked": [
     [
-      "@monolithlabs/wallet-connect-ui",
-      "@monolithlabs/wallet-connect-react",
-      "@monolithlabs/wallet-connect-vue"
+      "@monolithlabs-hub/wallet-connect-ui",
+      "@monolithlabs-hub/wallet-connect-react",
+      "@monolithlabs-hub/wallet-connect-vue"
     ]
   ],
   "access": "public",

@@ -5,7 +5,7 @@ import {
   type PlatformInfo,
   type WalletListEntry,
   type WalletManager,
-} from '@monolithlabs/wallet-connect-core'
+} from '@monolithlabs-hub/wallet-connect-core'
 import { act, renderHook } from '@testing-library/react'
 import { StrictMode, type ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'

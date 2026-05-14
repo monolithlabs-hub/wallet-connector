@@ -9,7 +9,7 @@ import {
   type WalletListEntry,
   type WalletManager,
   type WalletManagerConfig,
-} from '@monolithlabs/wallet-connect-core'
+} from '@monolithlabs-hub/wallet-connect-core'
 import { useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 
 import { WalletConnectContext } from '../context/wallet-connect-context'

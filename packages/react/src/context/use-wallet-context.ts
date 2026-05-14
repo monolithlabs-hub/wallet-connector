@@ -1,4 +1,4 @@
-import type { WalletManager } from '@monolithlabs/wallet-connect-core'
+import type { WalletManager } from '@monolithlabs-hub/wallet-connect-core'
 import { useContext } from 'react'
 
 import { WalletConnectContext } from './wallet-connect-context'

@@ -2,7 +2,7 @@ import {
   createWalletManager,
   type WalletManager,
   type WalletManagerConfig,
-} from '@monolithlabs/wallet-connect-core'
+} from '@monolithlabs-hub/wallet-connect-core'
 import { useEffect, useState, type ReactNode } from 'react'
 
 import { WalletConnectContext } from './wallet-connect-context'

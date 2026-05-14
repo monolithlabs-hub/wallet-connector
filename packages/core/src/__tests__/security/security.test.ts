@@ -467,7 +467,7 @@ describe('Security — callback URL cleanup', () => {
 // --- 4. Session storage — schema tampering / pollution ------------------
 
 describe('Security — session storage tampering', () => {
-  const PENDING_KEY = '@monolithlabs/wc:pendingState'
+  const PENDING_KEY = '@monolithlabs-hub/wc:pendingState'
 
   afterEach(() => {
     sessionStorage.clear()

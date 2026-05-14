@@ -4,12 +4,12 @@
 
 Security fixes are issued for the latest minor of each published package. Older minors do not receive backports — upgrade to the latest release line before reporting.
 
-| Package                              | Status       |
-| ------------------------------------ | ------------ |
-| `@monolithlabs/wallet-connect-core`  | Latest minor |
-| `@monolithlabs/wallet-connect-ui`    | Latest minor |
-| `@monolithlabs/wallet-connect-react` | Latest minor |
-| `@monolithlabs/wallet-connect-vue`   | Latest minor |
+| Package                                  | Status       |
+| ---------------------------------------- | ------------ |
+| `@monolithlabs-hub/wallet-connect-core`  | Latest minor |
+| `@monolithlabs-hub/wallet-connect-ui`    | Latest minor |
+| `@monolithlabs-hub/wallet-connect-react` | Latest minor |
+| `@monolithlabs-hub/wallet-connect-vue`   | Latest minor |
 
 ## Reporting a Vulnerability
 

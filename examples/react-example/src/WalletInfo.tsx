@@ -1,4 +1,4 @@
-import { useWallet } from '@monolithlabs/wallet-connect-react'
+import { useWallet } from '@monolithlabs-hub/wallet-connect-react'
 
 /**
  * Read-only inline display of the live wallet state — surfaces the
