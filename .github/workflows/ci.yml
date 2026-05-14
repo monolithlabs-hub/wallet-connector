@@ -100,3 +100,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           package_manager: pnpm
           build_script: build
+          script: pnpm exec size-limit --json
