@@ -57,6 +57,18 @@ export default tseslint.config(
         },
       ],
       'import-x/no-duplicates': 'error',
+      // TASK-701 security audit — ban `Math.random` outright. Anywhere we
+      // need randomness (keypairs, nonces, IDs) we must use a CSPRNG
+      // (`crypto.getRandomValues`, `crypto.randomUUID`, or `nacl.randomBytes`,
+      // which delegates to the platform CSPRNG). Tests opt out below.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MemberExpression[object.name='Math'][property.name='random']",
+          message:
+            'Math.random is not cryptographically secure. Use crypto.getRandomValues, crypto.randomUUID, or nacl.randomBytes for any value tied to security (keypairs, nonces, session ids, IVs).',
+        },
+      ],
     },
   },
 
@@ -80,6 +92,10 @@ export default tseslint.config(
     files: ['**/*.{test,spec}.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+      // Tests may need Math.random for shuffling fixtures, picking sample
+      // indexes, etc. — the security-sensitive guarantee is about
+      // production code only.
+      'no-restricted-syntax': 'off',
     },
   },
 
