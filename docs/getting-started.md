@@ -2,7 +2,7 @@
 
 Zero to a working Connect Wallet button in under ten minutes. Pick **React** or **Vue** below — the rest of the API surface is identical between the two.
 
-> Looking for a runnable reference? See `examples/react-example/` and `examples/vue-example/`. Both ship the same four scenarios — basic connect, SIWS sign-in, custom priority, and neutral mode — and run with `pnpm dev`.
+> Looking for a runnable reference? See `examples/vue-example/` — Vue 3.5 + Vite demo with four scenarios (basic connect, SIWS sign-in, custom priority, neutral mode). Run with `pnpm --filter @monolithlabs/wallet-connect-vue-example dev`. A matching React example is planned (PLAN.md TASK-601).
 
 ## What you'll build
 
@@ -12,7 +12,7 @@ A page-level button that, when clicked, opens a wallet picker, runs the connect 
 ┌────────────────────────────┐         ┌───────────────────────────┐
 │  [ Connect Wallet ]        │  click  │   Select a wallet         │
 │                            │  ────▶  │                           │
-│                            │         │   ▣ Phantom    Detected   │
+│                            │         │   ▣ Phantom               │
 │                            │         │   ▣ Solflare              │
 │                            │         │   ▣ Opindex     Install   │
 └────────────────────────────┘         └───────────────────────────┘
@@ -49,7 +49,7 @@ export const PHANTOM: WalletConfig = {
   id: 'phantom',
   name: 'Phantom',
   priority: 1,
-  icon: '', // filled at runtime from the Wallet Standard registry
+  icon: '', // empty renders a placeholder box; provide a real URL/data URI for a polished modal
   standardName: asWalletName('Phantom'),
   deepLinkScheme: 'phantom://',
   universalLink: 'https://phantom.app/ul/v1/connect',

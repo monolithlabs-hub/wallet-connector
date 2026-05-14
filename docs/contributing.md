@@ -13,8 +13,7 @@ packages/
   react/  @monolithlabs/wallet-connect-react  — useWallet() + <ConnectButton>
   vue/    @monolithlabs/wallet-connect-vue    — composable + ConnectButton.vue
 examples/
-  react-example/                              — Vite + React demo app
-  vue-example/                                — Vite + Vue 3 demo app
+  vue-example/                                — Vite + Vue 3 demo app (TASK-602)
 docs/                                         — you are here
 ```
 
@@ -42,11 +41,11 @@ Format and verify with `pnpm format` / `pnpm format:check`. Pre-commit runs `lin
 
 ## Adding a new wallet
 
-There are two ways a wallet can show up in the modal: as an entry in `config.wallets` (configured by the dapp) or via Wallet Standard auto-discovery (the user just has it installed). Most "supported wallets" work because of the latter.
+A wallet shows up in the modal when the consumer lists it in `config.wallets`. The library doesn't yet auto-merge Wallet Standard-registered wallets that the consumer didn't list (planned for a future minor); for now, every wallet you want users to see goes into the config array.
 
 If you want to add a new wallet to the library's "recommended" set, the work is:
 
-1. Confirm the wallet implements the Solana Wallet Standard with at least `standard:connect`, `standard:events`, and a `solana:*` chain. If it does, desktop will Just Work.
+1. Confirm the wallet implements the Solana Wallet Standard with at least `standard:connect`, `standard:events`, and a `solana:*` chain. If it does, the manager will use the `StandardWalletAdapter` to connect on desktop without further work.
 2. Find the wallet's mobile Universal Link API and App Store / Play Store URLs. Add an entry to [docs/wallets.md](./wallets.md) with the `WalletConfig` recipe.
 3. If the wallet's deep-link URL format differs from Phantom's (the library's current `DeepLinkBuilder` target), note that in the doc and link to whatever workaround applies. The current builder is in `packages/core/src/adapters/deep-link-builder.ts`.
 

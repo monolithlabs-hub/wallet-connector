@@ -12,6 +12,8 @@ yarn-error.log*
 dist
 .turbo
 coverage
+test-results
+playwright-report
 
 # Playwright artifacts
 test-results

@@ -35,10 +35,14 @@ for (const match of md.matchAll(fenceRe)) {
   const lang = match[1]
   const code = match[2]
   if (!supported.has(lang)) continue
-  // Each match's `index` is byte offset; compute the 1-based line where
-  // the fence opens so error reporting points back to README.md.
+  // Each match's `index` is the byte offset of the opening backticks.
+  // The number of `\n` chars before that offset equals the (0-based) line
+  // index of the fence; adding 2 gives the 1-based line of the first
+  // *content* line (skipping past the ```lang fence line itself). That
+  // way a diagnostic at "snippet line 3" maps cleanly to README line
+  // `lineNumber + 2`.
   const before = md.slice(0, match.index)
-  const lineNumber = before.split('\n').length + 1 // +1 for the language fence line itself
+  const lineNumber = before.split('\n').length + 1
   snippets.push({ lang, code, lineNumber })
 }
 

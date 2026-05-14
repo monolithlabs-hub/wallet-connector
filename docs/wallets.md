@@ -1,11 +1,11 @@
 # Supported wallets
 
-Copy-pasteable `WalletConfig` entries for every wallet the library has been verified against. The library will work with any wallet that registers via the Solana Wallet Standard, even if it isn't listed here — Wallet Standard discovery picks them up automatically.
+Copy-pasteable `WalletConfig` entries for every wallet the library has been verified against. List the wallets you want to support in `WalletManagerConfig.wallets`; the manager uses the Wallet Standard registry under the hood to connect on desktop and the per-wallet Universal Link contract on mobile.
 
 The `WalletConfig` shape is documented in [configuration.md](./configuration.md#walletconfig). The most relevant fields per wallet:
 
-- `icon: ''` is normal. Leave it empty and Wallet Standard discovery fills it from the installed extension's `wallet.icon` data URI.
-- `standardName` is the wallet's Wallet Standard registration name. The library uses it for fast detection; if you leave it off, the library falls back to case-insensitive matching on `name`.
+- `icon` should be a real URL or `data:` URI. An empty string renders a small placeholder box, which is fine for development but not for a polished modal.
+- `standardName` is the wallet's Wallet Standard registration name. The manager pairs the configured wallet to its `StandardWalletAdapter` by this name first; if you leave it off, it falls back to case-insensitive matching on `name`.
 - `deepLinkScheme` / `universalLink` / `appStoreUrl` / `playStoreUrl` are only consulted on the mobile (`'deeplink'`) strategy.
 
 ## Phantom
@@ -107,7 +107,7 @@ export const OPINDEX: WalletConfig = {
   id: 'opindex',
   name: 'Opindex',
   priority: 10,
-  icon: '/* inline SVG data URI; see examples/react-example/src/wallets.ts */',
+  icon: '/* inline SVG data URI; see examples/vue-example/src/wallets.ts */',
   deepLinkScheme: 'opindex://',
   universalLink: 'https://opindex.app/ul/v1/connect',
   appStoreUrl: 'https://apps.apple.com/app/opindex',
@@ -117,13 +117,7 @@ export const OPINDEX: WalletConfig = {
 
 Opindex is the library's default pinned wallet. The `priority: 10` keeps it last among non-pinned wallets, which matters when the pin is disabled (`pinnedWallet: null` or desktop without the Opindex extension). See [opindex.md](./opindex.md) for the transparency disclosure and the disable knob.
 
-Opindex isn't a Wallet Standard wallet yet, so `icon: ''` won't auto-fill from the registry. The library's example apps ship a small inline SVG; substitute your own branding if you have it.
-
-## Auto-discovered wallets
-
-You don't have to list a wallet in `config.wallets` for it to show up. Any wallet registered with the Wallet Standard registry — Glow, Snap, Decaf, Talisman, MathWallet, etc. — gets auto-appended to the modal as a "discovered" entry, with its `wallet.icon` data URI and the "Detected" badge. The user can connect to it via `manager.connect('<slugified-name>')` exactly like a configured wallet (the React/Vue `<ConnectButton>` handles the slug derivation internally).
-
-If you want a discovered wallet to have a custom `priority` or to surface its mobile deep-link metadata, just add it to `config.wallets` — the merge prefers configured entries when names match.
+Opindex isn't a Wallet Standard wallet yet. The example apps ship a small inline SVG for its icon; substitute your own branding if you have it.
 
 ## Recipe: a balanced default set
 
@@ -133,4 +127,4 @@ A reasonable default for a new dapp:
 export const DEFAULT_WALLETS: WalletConfig[] = [PHANTOM, SOLFLARE, BACKPACK, OPINDEX]
 ```
 
-Three desktop/mobile-supported wallets users actually have installed, plus Opindex pinned (or not — see [opindex.md](./opindex.md)). Auto-discovery handles the long tail.
+Three desktop/mobile-supported wallets users actually have installed, plus Opindex pinned (or not — see [opindex.md](./opindex.md)). If a user has another wallet installed that isn't in your list, they'll need to switch to one of the configured wallets to use your dapp — automatic merging of unconfigured Wallet Standard wallets is planned for a future minor.

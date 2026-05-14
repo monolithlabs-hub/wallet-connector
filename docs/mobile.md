@@ -136,7 +136,7 @@ See `packages/core/src/wallet-manager.ts` for the full `WalletManager` interface
 
 - **`localhost:5173` (dev) and `https://myapp.example` (prod) are different origins.** A pending state saved on dev won't be found on prod. This is rarely a problem in practice because you only call `connect()` after the page loads on a specific origin, but be aware of it.
 - **Pending state is short-lived.** The library treats `PendingState` older than 10 minutes as expired and discards it. If your user pauses for ages between leaving the page and returning, they'll see the modal reset.
-- **`window.opindex` is a legacy escape hatch, not the canonical detection path.** Real Opindex registers via Wallet Standard. The window sentinel still flips the install badge to "Detected" for backward compat. See [opindex.md](./opindex.md).
+- **`window.opindex` is a legacy escape hatch, not the canonical detection path.** Real Opindex registers via Wallet Standard. The window sentinel still flips `platform.hasOpindexExtension` for backward compat, which suppresses the "Install" badge on the Opindex row. See [opindex.md](./opindex.md).
 - **The connect promise never resolves on the mobile calling page.** Don't write code like `await manager.connect('phantom'); doNextThing()` — `doNextThing` lives on the _return_ page. Use `onConnected` / `onAuthenticated` / `subscribe()` instead.
 
 ## Where to look in the source

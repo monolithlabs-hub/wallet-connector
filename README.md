@@ -4,15 +4,15 @@
 [![npm](https://img.shields.io/npm/v/@monolithlabs/wallet-connect-react.svg?label=npm%20%40monolithlabs%2Fwallet-connect-react)](https://www.npmjs.com/package/@monolithlabs/wallet-connect-react)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](#license)
 
-A Solana wallet-connect library for React and Vue. Collapses **pick wallet → connect → sign in** into a single button that works the same on a desktop with a browser extension and on a mobile browser via deep links, with optional Sign-In With Solana bundled into the connect step on mobile so there's only one round-trip.
+A Solana wallet-connect library for React and Vue. Collapses **pick wallet → connect → sign in** into a single button that works the same on a desktop with a browser extension and on a mobile browser via deep links. Sign-In With Solana is built in; on mobile the SIWS message is bundled into the connect deep link for wallets that consume it (Solflare, Backpack), forward-compatible with wallets that don't yet (Phantom — see the wallet table footnotes).
 
 > The badges above use `OWNER/REPO` as a placeholder. Replace it with the actual GitHub `<owner>/<repo>` slug once the remote is provisioned.
 
 ## Highlights
 
 - One `<ConnectButton>` that handles desktop extensions, mobile deep links, and the install-prompt fallback for users with neither.
-- Wallet Standard auto-discovery — every installed wallet shows up in the modal without configuration.
-- Sign-In With Solana (SIWS) as a single config flag; bundled into the mobile redirect when possible.
+- Wallet Standard under the hood for desktop connect flows — works with every Wallet Standard-compatible wallet you list in `wallets[]`.
+- Sign-In With Solana (SIWS) as a single config flag; bundled into the mobile redirect for wallets that accept it.
 - Framework parity between React and Vue: same `useWallet()` shape, same `<ConnectButton>` props.
 - Framework-agnostic core (`@monolithlabs/wallet-connect-core`) for non-React/Vue stacks.
 
@@ -125,18 +125,18 @@ The strategy is decided automatically by `detectPlatform()` — you don't pick i
 
 ## Supported wallets
 
-The library has been verified against the wallets below. Any wallet that registers via the Solana Wallet Standard auto-appears in the modal even if it isn't listed here.
+The library has been verified against the wallets below. List the ones you want in `WalletManagerConfig.wallets`; the library uses Wallet Standard to drive desktop connects and the wallet's Universal Link contract for mobile.
 
-| Wallet          | Desktop (Wallet Standard) | Mobile (deep link)                | Bundled SIWS    |
-| --------------- | ------------------------- | --------------------------------- | --------------- |
-| Phantom         | ✓                         | ✓ (Phantom-shaped universal link) | Forward-compat¹ |
-| Solflare        | ✓                         | ✓                                 | ✓               |
-| Backpack        | ✓                         | ✓                                 | ✓               |
-| Coinbase Wallet | ✓                         | Best-effort²                      | —               |
-| Trust           | ✓                         | Best-effort²                      | —               |
-| Opindex         | ✓                         | ✓                                 | ✓               |
+| Wallet          | Desktop (Wallet Standard) | Mobile (deep link)                | Bundled SIWS¹  |
+| --------------- | ------------------------- | --------------------------------- | -------------- |
+| Phantom         | ✓                         | ✓ (Phantom-shaped universal link) | Forward-compat |
+| Solflare        | ✓                         | ✓                                 | Forward-compat |
+| Backpack        | ✓                         | ✓                                 | Forward-compat |
+| Coinbase Wallet | ✓                         | Best-effort²                      | —              |
+| Trust           | ✓                         | Best-effort²                      | —              |
+| Opindex         | ✓                         | ✓                                 | Forward-compat |
 
-¹ Phantom currently ignores the `sign_in_message` parameter — bundled SIWS in the connect URL is forward-compatible with Phantom but doesn't shorten the round-trip there yet.
+¹ The library always emits the `sign_in_message` parameter when `requireSignIn: true` is set. Whether the wallet _consumes_ it to short-circuit the round-trip is up to the wallet — Phantom currently ignores it, and adoption across the other wallets isn't formally verified by the library's test suite. Treat "Forward-compat" as "the library is wired correctly; mobile-side support varies".
 ² Coinbase Wallet and Trust use deep-link URL formats that differ from the Phantom universal-link shape the library targets. Desktop is fully supported; on mobile the deep-link probe falls back to the App Store / Play Store after 1500 ms if the wallet isn't installed.
 
 Copy-pasteable `WalletConfig` recipes for every wallet are in [docs/wallets.md](./docs/wallets.md).
@@ -169,10 +169,11 @@ The full transparency disclosure, including the second-order effects of disablin
 - [docs/opindex.md](./docs/opindex.md) — Opindex pinning transparency + how to disable.
 - [docs/contributing.md](./docs/contributing.md) — how to add a new wallet or change the core.
 
-Runnable reference apps:
+Runnable reference app:
 
-- `examples/react-example/` — Vite + React 19 demo with four scenarios (basic connect, SIWS, custom priority, neutral mode).
-- `examples/vue-example/` — Vite + Vue 3.5 demo with the same four scenarios.
+- `examples/vue-example/` — Vite + Vue 3.5 demo with four scenarios (basic connect, SIWS, custom priority, neutral mode). Run with `pnpm --filter @monolithlabs/wallet-connect-vue-example dev`.
+
+A matching React example is planned (PLAN.md TASK-601).
 
 ## License
 

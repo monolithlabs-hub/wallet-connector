@@ -38,7 +38,14 @@ function parseRoute(hash: string): Route {
   return ROUTES.some((r) => r.id === stripped) ? (stripped as Route) : 'basic'
 }
 
-const route = ref<Route>(parseRoute(window.location.hash))
+function initialRoute(): Route {
+  // SSR guard: `window` is undefined on the server. The hashchange
+  // listener registers in `onMounted`, which only fires on the client.
+  if (typeof window === 'undefined') return 'basic'
+  return parseRoute(window.location.hash)
+}
+
+const route = ref<Route>(initialRoute())
 
 function handleHashChange(): void {
   route.value = parseRoute(window.location.hash)
@@ -108,31 +115,36 @@ const neutralConfig: WalletManagerConfig = {
   requireSignIn: false,
 }
 
-const activeTitle = computed(() => {
-  switch (route.value) {
-    case 'basic':
-      return 'Basic connect'
-    case 'siws':
-      return 'Connect with Sign-In With Solana'
-    case 'priority':
-      return 'Custom wallet priority'
-    case 'neutral':
-      return 'Neutral mode (no Opindex pinning)'
-  }
-})
+// Single Route → copy lookup keeps `activeTitle` and `activeDescription`
+// exhaustive at the type level: `Record<Route, …>` forces TS to flag a
+// missing branch if a new Route variant is added without updating the
+// copy. Switch statements over a union are TS-checked for assignment
+// returns but not for missing cases.
+const ROUTE_COPY: Record<Route, { title: string; description: string }> = {
+  basic: {
+    title: 'Basic connect',
+    description:
+      'Default configuration — three wallets, Opindex pinning enabled, no sign-in step. Once the wallet returns a public key, the flow lands in `authenticated`.',
+  },
+  siws: {
+    title: 'Connect with Sign-In With Solana',
+    description:
+      '`requireSignIn: true` chains a SIWS signature onto the connect flow. The modal stays open through the signing step; on mobile the SIWS message is bundled into the connect deep link for wallets that consume it.',
+  },
+  priority: {
+    title: 'Custom wallet priority',
+    description:
+      '`WalletConfig.priority` orders non-pinned wallets ascending. Here Solflare is priority 1, Phantom 2, Opindex 3 — Solflare leads on desktop without the Opindex extension; on mobile the Opindex pin still wins index 0.',
+  },
+  neutral: {
+    title: 'Neutral mode (no Opindex pinning)',
+    description:
+      '`pinnedWallet: null` disables the Opindex pin everywhere — including mobile. The wallet list sorts purely by priority. Use this in consumer dapps that want to surface wallets neutrally.',
+  },
+}
 
-const activeDescription = computed(() => {
-  switch (route.value) {
-    case 'basic':
-      return 'Default configuration — three wallets, Opindex pinning enabled, no sign-in step. Once the wallet returns a public key, the flow lands in `authenticated`.'
-    case 'siws':
-      return '`requireSignIn: true` chains a SIWS signature onto the connect flow. The modal stays open through the signing step; on mobile the SIWS message is bundled into the connect deep link so it’s one round trip.'
-    case 'priority':
-      return '`WalletConfig.priority` orders non-pinned wallets ascending. Here Solflare is priority 1, Phantom 2, Opindex 3 — Solflare leads on desktop without the Opindex extension; on mobile the Opindex pin still wins index 0.'
-    case 'neutral':
-      return '`pinnedWallet: null` disables the Opindex pin everywhere — including mobile. The wallet list sorts purely by priority. Use this in consumer dapps that want to surface wallets neutrally.'
-  }
-})
+const activeTitle = computed(() => ROUTE_COPY[route.value].title)
+const activeDescription = computed(() => ROUTE_COPY[route.value].description)
 
 // --- Inline default styling --------------------------------------------
 
