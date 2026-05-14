@@ -7,7 +7,9 @@
     { "pattern": "^https?://opindex\\.app" },
     { "pattern": "^https?://apps\\.apple\\.com/" },
     { "pattern": "^https?://play\\.google\\.com/" },
-    { "pattern": "OWNER/REPO" }
+    { "pattern": "OWNER/REPO" },
+    { "pattern": "^https?://(www\\.)?npmjs\\.com/package/@monolithlabs/" },
+    { "pattern": "^https?://img\\.shields\\.io/npm/v/@monolithlabs/" }
   ],
   "replacementPatterns": [],
   "retryOn429": true,

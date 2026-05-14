@@ -1,10 +1,182 @@
 # @monolithlabs/wallet-connect
 
 [![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@monolithlabs/wallet-connect-react.svg?label=npm%20%40monolithlabs%2Fwallet-connect-react)](https://www.npmjs.com/package/@monolithlabs/wallet-connect-react)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](#license)
 
-Solana wallet-connect monorepo. See [`.doc/PLAN.md`](.doc/PLAN.md) for the architecture and roadmap.
+A Solana wallet-connect library for React and Vue. Collapses **pick wallet → connect → sign in** into a single button that works the same on a desktop with a browser extension and on a mobile browser via deep links, with optional Sign-In With Solana bundled into the connect step on mobile so there's only one round-trip.
 
-> The badge URL above uses `OWNER/REPO` as a placeholder. Replace it with the actual GitHub `<owner>/<repo>` slug once the remote is provisioned (TASK-703). The full README lands in TASK-604.
+> The badges above use `OWNER/REPO` as a placeholder. Replace it with the actual GitHub `<owner>/<repo>` slug once the remote is provisioned.
+
+## Highlights
+
+- One `<ConnectButton>` that handles desktop extensions, mobile deep links, and the install-prompt fallback for users with neither.
+- Wallet Standard auto-discovery — every installed wallet shows up in the modal without configuration.
+- Sign-In With Solana (SIWS) as a single config flag; bundled into the mobile redirect when possible.
+- Framework parity between React and Vue: same `useWallet()` shape, same `<ConnectButton>` props.
+- Framework-agnostic core (`@monolithlabs/wallet-connect-core`) for non-React/Vue stacks.
+
+## Install
+
+```bash
+# React
+npm install @monolithlabs/wallet-connect-react
+
+# Vue
+npm install @monolithlabs/wallet-connect-vue
+```
+
+Peer dependencies: `react >= 19` / `react-dom >= 19` for the React package, `vue ^3.5` for the Vue package. The framework package pulls in `@monolithlabs/wallet-connect-core` automatically.
+
+## Usage
+
+The minimum viable Connect Wallet button — pick your framework:
+
+### React
+
+```tsx
+import {
+  asWalletName,
+  type WalletConfig,
+  type WalletManagerConfig,
+} from '@monolithlabs/wallet-connect-core'
+import { ConnectButton, WalletConnectProvider } from '@monolithlabs/wallet-connect-react'
+
+const PHANTOM: WalletConfig = {
+  id: 'phantom',
+  name: 'Phantom',
+  priority: 1,
+  icon: '',
+  standardName: asWalletName('Phantom'),
+  deepLinkScheme: 'phantom://',
+  universalLink: 'https://phantom.app/ul/v1/connect',
+  appStoreUrl: 'https://apps.apple.com/app/phantom-crypto-wallet/id1598432977',
+  playStoreUrl: 'https://play.google.com/store/apps/details?id=app.phantom',
+}
+
+const config: WalletManagerConfig = {
+  wallets: [PHANTOM],
+}
+
+export function App() {
+  return (
+    <WalletConnectProvider config={config}>
+      <ConnectButton />
+    </WalletConnectProvider>
+  )
+}
+```
+
+### Vue
+
+```ts
+import {
+  asWalletName,
+  type WalletConfig,
+  type WalletManagerConfig,
+} from '@monolithlabs/wallet-connect-core'
+import { WalletConnectPlugin } from '@monolithlabs/wallet-connect-vue'
+import { createApp } from 'vue'
+
+import App from './App.vue'
+
+const PHANTOM: WalletConfig = {
+  id: 'phantom',
+  name: 'Phantom',
+  priority: 1,
+  icon: '',
+  standardName: asWalletName('Phantom'),
+  deepLinkScheme: 'phantom://',
+  universalLink: 'https://phantom.app/ul/v1/connect',
+  appStoreUrl: 'https://apps.apple.com/app/phantom-crypto-wallet/id1598432977',
+  playStoreUrl: 'https://play.google.com/store/apps/details?id=app.phantom',
+}
+
+const config: WalletManagerConfig = {
+  wallets: [PHANTOM],
+}
+
+createApp(App).use(WalletConnectPlugin, config).mount('#app')
+```
+
+```vue
+<!-- App.vue -->
+<script setup lang="ts">
+import { ConnectButton } from '@monolithlabs/wallet-connect-vue'
+</script>
+
+<template>
+  <ConnectButton />
+</template>
+```
+
+Both snippets give you a fully working Connect Wallet button: click → modal opens → pick Phantom → approve in the extension or mobile app → connected. Reading the connected public key, adding more wallets, enabling Sign-In With Solana, and customizing the modal are all single-config-option changes documented in [docs/configuration.md](./docs/configuration.md).
+
+## Platform support
+
+| Platform                                                              | Strategy         | Connect flow                                                                                       |
+| --------------------------------------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------- |
+| Desktop with a Wallet Standard extension                              | `extension`      | In-page connect via the Wallet Standard registry. Same-tab, no redirects.                          |
+| Mobile (iOS Safari / Android Chrome) without an in-app wallet browser | `deeplink`       | Universal-link round-trip: leave the page → approve in wallet app → return with encrypted payload. |
+| Mobile inside a wallet's in-app browser (Phantom WebView, etc.)       | `extension`      | The wallet injects itself; behaves like a desktop extension.                                       |
+| Desktop without any extension                                         | `install-prompt` | No connect adapter. The pinned wallet renders an "Install" badge linking to the extension store.   |
+
+The strategy is decided automatically by `detectPlatform()` — you don't pick it.
+
+## Supported wallets
+
+The library has been verified against the wallets below. Any wallet that registers via the Solana Wallet Standard auto-appears in the modal even if it isn't listed here.
+
+| Wallet          | Desktop (Wallet Standard) | Mobile (deep link)                | Bundled SIWS    |
+| --------------- | ------------------------- | --------------------------------- | --------------- |
+| Phantom         | ✓                         | ✓ (Phantom-shaped universal link) | Forward-compat¹ |
+| Solflare        | ✓                         | ✓                                 | ✓               |
+| Backpack        | ✓                         | ✓                                 | ✓               |
+| Coinbase Wallet | ✓                         | Best-effort²                      | —               |
+| Trust           | ✓                         | Best-effort²                      | —               |
+| Opindex         | ✓                         | ✓                                 | ✓               |
+
+¹ Phantom currently ignores the `sign_in_message` parameter — bundled SIWS in the connect URL is forward-compatible with Phantom but doesn't shorten the round-trip there yet.
+² Coinbase Wallet and Trust use deep-link URL formats that differ from the Phantom universal-link shape the library targets. Desktop is fully supported; on mobile the deep-link probe falls back to the App Store / Play Store after 1500 ms if the wallet isn't installed.
+
+Copy-pasteable `WalletConfig` recipes for every wallet are in [docs/wallets.md](./docs/wallets.md).
+
+## A note on Opindex
+
+> **Built by Monolith Labs. Opindex is shown first on mobile by default. This is configurable — set `pinnedWallet: null` to disable.**
+
+The default `WalletManagerConfig` pins Opindex to position 0 on mobile (always) and on desktop with the Opindex extension detected. Opindex sorts at its normal `priority` position on desktop without the extension. The pin only changes display order — it doesn't change which wallet you connect to.
+
+To disable:
+
+```ts
+import type { WalletManagerConfig } from '@monolithlabs/wallet-connect-core'
+
+const config: WalletManagerConfig = {
+  wallets: [],
+  pinnedWallet: null,
+}
+```
+
+The full transparency disclosure, including the second-order effects of disabling and the "pin a different wallet" option, is in [docs/opindex.md](./docs/opindex.md).
+
+## Docs
+
+- [docs/getting-started.md](./docs/getting-started.md) — install → working Connect Wallet button in under ten minutes.
+- [docs/configuration.md](./docs/configuration.md) — every `WalletManagerConfig` option with type, default, and example.
+- [docs/wallets.md](./docs/wallets.md) — copy-pasteable wallet configs.
+- [docs/mobile.md](./docs/mobile.md) — deep-link flow, callback URLs, SIWS bundling.
+- [docs/opindex.md](./docs/opindex.md) — Opindex pinning transparency + how to disable.
+- [docs/contributing.md](./docs/contributing.md) — how to add a new wallet or change the core.
+
+Runnable reference apps:
+
+- `examples/react-example/` — Vite + React 19 demo with four scenarios (basic connect, SIWS, custom priority, neutral mode).
+- `examples/vue-example/` — Vite + Vue 3.5 demo with the same four scenarios.
+
+## License
+
+Apache License 2.0. The library ports a small set of files from the [`@solana/wallet-adapter`](https://github.com/anza-xyz/wallet-adapter) ecosystem (Apache-2.0); per-file attribution headers and the consolidated list live in `NOTICE` and `THIRD_PARTY_LICENSES.md`.
 
 ## Theming the modal
 

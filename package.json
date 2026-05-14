@@ -15,6 +15,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "docs:link-check": "node scripts/check-md-links.mjs",
+    "readme:check": "node scripts/check-readme-typescript.mjs",
     "changeset": "changeset",
     "e2e": "pnpm turbo build --filter=@monolithlabs/wallet-connect-react-example... && playwright test",
     "e2e:install": "playwright install --with-deps chromium firefox webkit",
