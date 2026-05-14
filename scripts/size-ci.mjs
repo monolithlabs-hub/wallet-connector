@@ -13,26 +13,8 @@ import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 
-// Resolve from the working directory rather than from this file's location,
-// so the wrapper works when staged outside the repo tree (e.g. in $RUNNER_TEMP
-// during CI, where this file lives next to the action's two-branch checkout).
-const require = createRequire(`${process.cwd()}/`)
-
-let pkgJsonPath
-try {
-  pkgJsonPath = require.resolve('size-limit/package.json')
-} catch (err) {
-  if (err && (err.code === 'MODULE_NOT_FOUND' || err.code === 'ERR_MODULE_NOT_FOUND')) {
-    // size-limit isn't installed in this checkout — typically the baseline
-    // (main) branch on the PR that first introduces bundle-size monitoring.
-    // Emit an empty result set so the size-limit GitHub action can still
-    // parse JSON and treat every measurement on the PR side as "added".
-    process.stdout.write('[]\n')
-    process.exit(0)
-  }
-  throw err
-}
-
+const require = createRequire(import.meta.url)
+const pkgJsonPath = require.resolve('size-limit/package.json')
 const pkg = require('size-limit/package.json')
 const binPath = join(dirname(pkgJsonPath), pkg.bin)
 
