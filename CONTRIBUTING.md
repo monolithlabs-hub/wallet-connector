@@ -1,6 +1,8 @@
 # Contributing
 
-Thanks for working on `@monolithlabs-hub/wallet-connect`. This document covers the only piece of process that's enforced in this repo: **changesets**.
+Thanks for working on `@monolithlabs-hub/wallet-connect`. By participating you agree to abide by the [Code of Conduct](./CODE_OF_CONDUCT.md). Security vulnerabilities should be reported privately — see [`SECURITY.md`](./SECURITY.md).
+
+This document covers the one piece of process that's enforced by CI: **changesets**.
 
 ## TL;DR
 
@@ -51,9 +53,9 @@ When in doubt, add a versioned one — an extra patch bump is cheap.
 
 1. PRs merge to `main` with changeset files in `.changeset/`.
 2. The `release.yml` workflow opens (or updates) a "release: version packages" PR. That PR aggregates all pending changesets, runs `changeset version` to bump versions and rewrite each package's `CHANGELOG.md`, then deletes the consumed changeset files.
-3. Merging the release PR triggers `changeset publish`, which publishes to npm.
+3. Merging the release PR triggers `changeset publish`, which publishes to npm with provenance attestations.
 
-Publishing is currently inert: all packages are `private: true` until **TASK-702** flips them and adds `publishConfig.access: "public"`. Until then, the release PR will still open and bump versions in-repo, but `changeset publish` will skip every package.
+All four publishable packages (`core`, `ui`, `react`, `vue`) are at `1.0.0` with `publishConfig.access: "public"` and `publishConfig.provenance: true`. Initial publish is performed manually by a maintainer (`pnpm -r publish` from the repo root); subsequent releases go through the changesets workflow described above.
 
 ## Commit messages
 
@@ -68,7 +70,22 @@ pnpm typecheck
 pnpm lint
 pnpm test
 pnpm build
+pnpm size              # bundle-size check against per-package limits
 pnpm changeset status  # confirms your changeset parses
 ```
 
-CI runs the same steps across Node 18 + 20.
+CI runs the same steps on Node 24 (see [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)). Bundle-size limits are enforced by a separate `Bundle size` job that also posts a per-package diff against `main` as a PR comment.
+
+## Reporting bugs and requesting features
+
+- **Bug reports** and **feature requests** use the templates at <https://github.com/monolithlabs-hub/wallet-connector/issues/new/choose>.
+- **Security vulnerabilities** go through a private channel — see [`SECURITY.md`](./SECURITY.md). Do not file public issues for security reports.
+- **Code of conduct** concerns are handled per [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md).
+
+## Porting code from upstream
+
+When porting source from `@solana/wallet-adapter` or `@wallet-standard` (both Apache-2.0):
+
+1. Add a file-level attribution header naming the upstream file and the Apache-2.0 license. Existing ports under `packages/core/src/` are reference examples.
+2. Add a row to [`THIRD_PARTY_LICENSES.md`](./THIRD_PARTY_LICENSES.md) listing the new file and its upstream path.
+3. The PR checklist's "attribution header on any newly-ported file" item must be ticked before merge.

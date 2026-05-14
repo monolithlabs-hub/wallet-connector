@@ -1,0 +1,62 @@
+name: Feature request
+description: Suggest a new feature, a new wallet integration, or a public-API change.
+title: '[feature] '
+labels: ['enhancement', 'needs-triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to suggest a feature. The more specific you can be about the use case and the proposed API surface, the more actionable this becomes.
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: What problem are you trying to solve? What does the workaround look like today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: |
+        What would the API or behavior look like? Concrete example snippets are ideal — they pin down the surface area faster than prose.
+      placeholder: |
+        ```ts
+        const config: WalletManagerConfig = {
+          wallets: [PHANTOM],
+          newFlag: true,
+        }
+        ```
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other ways you've thought about solving this. Why didn't they fit?
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      description: Which package(s) would this touch?
+      multiple: true
+      options:
+        - '@monolithlabs-hub/wallet-connect-core'
+        - '@monolithlabs-hub/wallet-connect-ui'
+        - '@monolithlabs-hub/wallet-connect-react'
+        - '@monolithlabs-hub/wallet-connect-vue'
+        - Tooling / CI / docs
+        - Unsure
+    validations:
+      required: true
+  - type: checkboxes
+    id: breaking
+    attributes:
+      label: Compatibility
+      options:
+        - label: This proposal would require a breaking change to the public API.
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Links to related issues, prior art in other wallet libraries, RFCs, anything else useful.

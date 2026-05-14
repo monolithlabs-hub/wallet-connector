@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/monolithlabs-hub/wallet-connector/security/advisories/new
+    about: Report a security vulnerability privately via GitHub Security Advisories. Please do not file public issues for security reports — see SECURITY.md.
+  - name: Question or discussion
+    url: https://github.com/monolithlabs-hub/wallet-connector/discussions
+    about: Ask a usage question or start a design discussion.

@@ -185,6 +185,13 @@ Runnable reference app:
 
 A matching React example is planned (PLAN.md TASK-601).
 
+## Contributing
+
+PRs and issues welcome. Start with [`CONTRIBUTING.md`](./CONTRIBUTING.md) — it covers the changeset requirement, branch workflow, and local verification steps. By participating you agree to the [Code of Conduct](./CODE_OF_CONDUCT.md).
+
+- **Bug reports / feature requests:** use the [issue templates](https://github.com/monolithlabs-hub/wallet-connector/issues/new/choose).
+- **Security vulnerabilities:** report privately via [GitHub Security Advisories](https://github.com/monolithlabs-hub/wallet-connector/security/advisories/new) — see [`SECURITY.md`](./SECURITY.md).
+
 ## License
 
 MIT, see [`LICENSE`](./LICENSE). The `@monolithlabs-hub/wallet-connect-core` package additionally ports a small set of files from the [`@solana/wallet-adapter`](https://github.com/anza-xyz/wallet-adapter) ecosystem (Apache-2.0); per-file attribution headers and the consolidated list live in [`NOTICE`](./NOTICE) and [`THIRD_PARTY_LICENSES.md`](./THIRD_PARTY_LICENSES.md), both of which ship inside the published `core` tarball.
