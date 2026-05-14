@@ -1,11 +1,18 @@
 #!/usr/bin/env node
 /**
  * Walk every .md file under docs/ (plus the root README.md when present)
- * and run `markdown-link-check` against each. Exits non-zero if any file
- * has a broken link.
+ * and run linkinator against each. Exits non-zero if any file has a
+ * broken link.
  *
- * markdown-link-check's CLI is per-file — this script handles the loop +
- * aggregate exit code in a portable way (no shell-specific globbing).
+ * Why a Node wrapper around the linkinator CLI?
+ *  - linkinator can scan one location at a time. The wrapper handles the
+ *    per-file iteration in a portable way (no shell-specific globbing).
+ *  - Aggregating the exit code lets us walk every file even when an
+ *    earlier file has broken links — the user sees them all in one run
+ *    instead of finding-and-fixing one at a time.
+ *
+ * linkinator config (ignored URL patterns, retry behavior) lives at
+ * `linkinator.config.json` at the repo root.
  */
 
 import { execSync } from 'node:child_process'
@@ -14,7 +21,7 @@ import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const configPath = join(repoRoot, '.markdown-link-check.json')
+const configPath = join(repoRoot, 'linkinator.config.json')
 
 function collectMarkdown(dir) {
   const out = []
@@ -46,7 +53,7 @@ for (const file of targets) {
   process.stdout.write(`\n→ Checking ${rel}\n`)
   try {
     execSync(
-      `pnpm exec markdown-link-check --config ${JSON.stringify(configPath)} ${JSON.stringify(file)}`,
+      `pnpm exec linkinator --markdown --config ${JSON.stringify(configPath)} ${JSON.stringify(file)}`,
       { stdio: 'inherit', cwd: repoRoot },
     )
   } catch {
