@@ -80,10 +80,10 @@ importers:
 
   examples/react-example:
     dependencies:
-      '@monolithlabs/wallet-connect-core':
+      '@monolithlabs-hub/wallet-connect-core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@monolithlabs/wallet-connect-react':
+      '@monolithlabs-hub/wallet-connect-react':
         specifier: workspace:*
         version: link:../../packages/react
       react:
@@ -108,10 +108,10 @@ importers:
 
   examples/vue-example:
     dependencies:
-      '@monolithlabs/wallet-connect-core':
+      '@monolithlabs-hub/wallet-connect-core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@monolithlabs/wallet-connect-vue':
+      '@monolithlabs-hub/wallet-connect-vue':
         specifier: workspace:*
         version: link:../../packages/vue
       vue:
@@ -151,10 +151,10 @@ importers:
 
   packages/react:
     dependencies:
-      '@monolithlabs/wallet-connect-core':
+      '@monolithlabs-hub/wallet-connect-core':
         specifier: workspace:*
         version: link:../core
-      '@monolithlabs/wallet-connect-ui':
+      '@monolithlabs-hub/wallet-connect-ui':
         specifier: workspace:*
         version: link:../ui
     devDependencies:
@@ -184,10 +184,10 @@ importers:
 
   packages/vue:
     dependencies:
-      '@monolithlabs/wallet-connect-core':
+      '@monolithlabs-hub/wallet-connect-core':
         specifier: workspace:*
         version: link:../core
-      '@monolithlabs/wallet-connect-ui':
+      '@monolithlabs-hub/wallet-connect-ui':
         specifier: workspace:*
         version: link:../ui
     devDependencies:

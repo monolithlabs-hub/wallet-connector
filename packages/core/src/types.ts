@@ -5,7 +5,7 @@
  * implementation they describe); this file re-exports them so consumers
  * have ONE canonical import path:
  *
- *   import type { WalletConfig, FlowState, WalletManagerConfig } from '@monolithlabs/wallet-connect-core'
+ *   import type { WalletConfig, FlowState, WalletManagerConfig } from '@monolithlabs-hub/wallet-connect-core'
  *
  * Conventions:
  * - Project-specific types (defined in this codebase) are re-exported here.

@@ -1,7 +1,32 @@
 {
-  "name": "@monolithlabs/wallet-connect-vue",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@monolithlabs-hub/wallet-connect-vue",
+  "version": "1.0.0",
+  "description": "Vue 3 bindings for @monolithlabs-hub/wallet-connect: useWallet() composable, WalletConnectPlugin, and a ready-made <ConnectButton/> with SIWS support.",
+  "keywords": [
+    "solana",
+    "wallet",
+    "wallet-connect",
+    "vue",
+    "vue3",
+    "composable",
+    "sign-in-with-solana",
+    "siws",
+    "phantom",
+    "solflare",
+    "backpack",
+    "web3"
+  ],
+  "homepage": "https://github.com/monolithlabs-hub/wallet-connector#readme",
+  "bugs": {
+    "url": "https://github.com/monolithlabs-hub/wallet-connector/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/monolithlabs-hub/wallet-connector.git",
+    "directory": "packages/vue"
+  },
+  "license": "MIT",
+  "author": "Monolith Labs",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -19,18 +44,27 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE"
   ],
   "sideEffects": false,
+  "engines": {
+    "node": ">=18.18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "build": "tsup && vue-tsc -p tsconfig.build.json",
     "test": "vitest run --coverage",
     "lint": "eslint . --max-warnings=0",
-    "typecheck": "vue-tsc --noEmit -p tsconfig.json"
+    "typecheck": "vue-tsc --noEmit -p tsconfig.json",
+    "prepack": "cp ../../LICENSE ."
   },
   "dependencies": {
-    "@monolithlabs/wallet-connect-core": "workspace:*",
-    "@monolithlabs/wallet-connect-ui": "workspace:*"
+    "@monolithlabs-hub/wallet-connect-core": "workspace:*",
+    "@monolithlabs-hub/wallet-connect-ui": "workspace:*"
   },
   "peerDependencies": {
     "vue": "^3.5.0"

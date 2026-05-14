@@ -44,7 +44,7 @@ export default defineConfig({
     // `vite dev` is fine for E2E — no build step, fast iteration. If we
     // ever need a closer-to-prod target, switch to `vite preview`
     // (requires a prior `vite build`).
-    command: 'pnpm --filter @monolithlabs/wallet-connect-react-example exec vite dev',
+    command: 'pnpm --filter @monolithlabs-hub/wallet-connect-react-example exec vite dev',
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,

@@ -2,7 +2,7 @@ import {
   type FlowState,
   type PlatformInfo,
   type WalletListEntry,
-} from '@monolithlabs/wallet-connect-core'
+} from '@monolithlabs-hub/wallet-connect-core'
 import {
   attachModal,
   getDialogAttributes,
@@ -11,7 +11,7 @@ import {
   truncatePublicKey,
   type StatusBadge,
   type WalletStatus,
-} from '@monolithlabs/wallet-connect-ui'
+} from '@monolithlabs-hub/wallet-connect-ui'
 import {
   useCallback,
   useEffect,
@@ -95,7 +95,7 @@ function initialFor(name: string): string {
  *   the modal in "connected" mode with a Disconnect action.
  *
  * Modal accessibility, focus management, and body scroll lock are
- * handled by `@monolithlabs/wallet-connect-ui`'s {@link attachModal} —
+ * handled by `@monolithlabs-hub/wallet-connect-ui`'s {@link attachModal} —
  * see `WalletModal` below for the integration.
  */
 export function ConnectButton({
@@ -220,7 +220,7 @@ export function ConnectButton({
 
 // ---------------------------------------------------------------------------
 // Internal rendering helpers. Lifecycle / a11y wiring delegated to
-// `@monolithlabs/wallet-connect-ui` (TASK-401); this file only owns the JSX
+// `@monolithlabs-hub/wallet-connect-ui` (TASK-401); this file only owns the JSX
 // shape and the inline default styling.
 // ---------------------------------------------------------------------------
 
@@ -384,7 +384,7 @@ function ConnectedView({
 // Default styling. Every visual value reads from a CSS custom property
 // (e.g., `var(--wc-bg, #fff)`) so consumers can theme by setting variables
 // on `[role="dialog"]`, on `[data-wc-modal]`, on a parent element, or on
-// `:root`. The `@monolithlabs/wallet-connect-ui` package injects a small
+// `:root`. The `@monolithlabs-hub/wallet-connect-ui` package injects a small
 // stylesheet with the variable defaults plus hover / focus-visible / disabled
 // rules (which can't be expressed via inline `style`).
 // ---------------------------------------------------------------------------

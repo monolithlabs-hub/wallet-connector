@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useWallet } from '@monolithlabs/wallet-connect-vue'
+import { useWallet } from '@monolithlabs-hub/wallet-connect-vue'
 import type { CSSProperties } from 'vue'
 
 /**

@@ -2,7 +2,7 @@
 
 Zero to a working Connect Wallet button in under ten minutes. Pick **React** or **Vue** below — the rest of the API surface is identical between the two.
 
-> Looking for a runnable reference? See `examples/vue-example/` — Vue 3.5 + Vite demo with four scenarios (basic connect, SIWS sign-in, custom priority, neutral mode). Run with `pnpm --filter @monolithlabs/wallet-connect-vue-example dev`. A matching React example is planned (PLAN.md TASK-601).
+> Looking for a runnable reference? See `examples/vue-example/` — Vue 3.5 + Vite demo with four scenarios (basic connect, SIWS sign-in, custom priority, neutral mode). Run with `pnpm --filter @monolithlabs-hub/wallet-connect-vue-example dev`. A matching React example is planned (PLAN.md TASK-601).
 
 ## What you'll build
 
@@ -24,10 +24,10 @@ The library ships three published packages — one for framework-agnostic logic,
 
 ```bash
 # React
-npm install @monolithlabs/wallet-connect-react
+npm install @monolithlabs-hub/wallet-connect-react
 
 # Vue
-npm install @monolithlabs/wallet-connect-vue
+npm install @monolithlabs-hub/wallet-connect-vue
 ```
 
 Peer dependencies:
@@ -43,7 +43,7 @@ The manager is the single source of truth for the connect flow. You define it on
 
 ```tsx
 // src/wallets.ts
-import { asWalletName, type WalletConfig } from '@monolithlabs/wallet-connect-core'
+import { asWalletName, type WalletConfig } from '@monolithlabs-hub/wallet-connect-core'
 
 export const PHANTOM: WalletConfig = {
   id: 'phantom',
@@ -60,8 +60,8 @@ export const PHANTOM: WalletConfig = {
 
 ```tsx
 // src/App.tsx
-import type { WalletManagerConfig } from '@monolithlabs/wallet-connect-core'
-import { ConnectButton, WalletConnectProvider } from '@monolithlabs/wallet-connect-react'
+import type { WalletManagerConfig } from '@monolithlabs-hub/wallet-connect-core'
+import { ConnectButton, WalletConnectProvider } from '@monolithlabs-hub/wallet-connect-react'
 
 import { PHANTOM } from './wallets'
 
@@ -87,7 +87,7 @@ That's the minimum viable connect button. Click it; the modal opens; pick Phanto
 ```ts
 // src/main.ts
 import { createApp } from 'vue'
-import { WalletConnectPlugin } from '@monolithlabs/wallet-connect-vue'
+import { WalletConnectPlugin } from '@monolithlabs-hub/wallet-connect-vue'
 
 import App from './App.vue'
 import { PHANTOM } from './wallets'
@@ -100,7 +100,7 @@ createApp(App)
 ```vue
 <!-- src/App.vue -->
 <script setup lang="ts">
-import { ConnectButton } from '@monolithlabs/wallet-connect-vue'
+import { ConnectButton } from '@monolithlabs-hub/wallet-connect-vue'
 </script>
 
 <template>
@@ -117,7 +117,7 @@ Same shape: install the plugin once with your config, drop the `<ConnectButton>`
 ### React
 
 ```tsx
-import { useWallet } from '@monolithlabs/wallet-connect-react'
+import { useWallet } from '@monolithlabs-hub/wallet-connect-react'
 
 function MyAccountBadge() {
   const { state, publicKey, isAuthenticated } = useWallet()
@@ -134,7 +134,7 @@ function MyAccountBadge() {
 
 ```vue
 <script setup lang="ts">
-import { useWallet } from '@monolithlabs/wallet-connect-vue'
+import { useWallet } from '@monolithlabs-hub/wallet-connect-vue'
 
 const { state, publicKey, isAuthenticated } = useWallet()
 </script>

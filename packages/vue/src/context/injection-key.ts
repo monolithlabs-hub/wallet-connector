@@ -1,4 +1,4 @@
-import type { WalletManager } from '@monolithlabs/wallet-connect-core'
+import type { WalletManager } from '@monolithlabs-hub/wallet-connect-core'
 import type { InjectionKey } from 'vue'
 
 /**
@@ -12,5 +12,5 @@ import type { InjectionKey } from 'vue'
  * once it lands.
  */
 export const WalletConnectInjectionKey: InjectionKey<WalletManager> = Symbol(
-  '@monolithlabs/wallet-connect-vue:WalletManager',
+  '@monolithlabs-hub/wallet-connect-vue:WalletManager',
 )

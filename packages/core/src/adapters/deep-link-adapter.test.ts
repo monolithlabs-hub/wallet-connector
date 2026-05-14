@@ -447,7 +447,7 @@ describe('DeepLinkAdapter.resumeFromCallback', () => {
       requireSignIn: false,
       timestamp: Date.now(),
     }
-    sessionStorage.setItem('@monolithlabs/wc:pendingState', JSON.stringify(stale))
+    sessionStorage.setItem('@monolithlabs-hub/wc:pendingState', JSON.stringify(stale))
     const callbackUrl = makeCallbackUrl({
       baseUrl: 'https://dapp.example.com/cb',
       payload: { public_key: FAKE_PUBKEY, session: FAKE_SESSION },

@@ -11,7 +11,7 @@ The `WalletConfig` shape is documented in [configuration.md](./configuration.md#
 ## Phantom
 
 ```ts
-import { asWalletName, type WalletConfig } from '@monolithlabs/wallet-connect-core'
+import { asWalletName, type WalletConfig } from '@monolithlabs-hub/wallet-connect-core'
 
 export const PHANTOM: WalletConfig = {
   id: 'phantom',

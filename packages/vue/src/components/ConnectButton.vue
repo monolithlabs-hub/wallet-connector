@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { type FlowState, type WalletListEntry } from '@monolithlabs/wallet-connect-core'
+import { type FlowState, type WalletListEntry } from '@monolithlabs-hub/wallet-connect-core'
 import {
   attachModal,
   getDialogAttributes,
@@ -9,7 +9,7 @@ import {
   type ModalHandle,
   type StatusBadge,
   type WalletStatus,
-} from '@monolithlabs/wallet-connect-ui'
+} from '@monolithlabs-hub/wallet-connect-ui'
 import {
   computed,
   nextTick,
@@ -26,7 +26,7 @@ import { useWallet } from '../composables/use-wallet'
 /**
  * Ready-to-use Vue 3 component that runs the full wallet connect flow.
  *
- * Mirrors `@monolithlabs/wallet-connect-react`'s `<ConnectButton>` in
+ * Mirrors `@monolithlabs-hub/wallet-connect-react`'s `<ConnectButton>` in
  * behavior — same modal shell, focus trap, ARIA, and badge logic —
  * implemented as a Vue 3 single-file component using `<script setup>`.
  *
@@ -41,7 +41,7 @@ import { useWallet } from '../composables/use-wallet'
  *
  * **Modal lifecycle** (focus trap, initial focus, focus restoration on
  * close, body scroll lock, Escape handler): delegated to
- * `@monolithlabs/wallet-connect-ui`'s `attachModal`. This component owns
+ * `@monolithlabs-hub/wallet-connect-ui`'s `attachModal`. This component owns
  * the JSX shape, the open/close state, and the inline default styling
  * only.
  */
@@ -223,7 +223,7 @@ const dialogAttrs = computed(() => getDialogAttributes(titleId))
 // Every visual value reads from a CSS custom property (`var(--wc-foo,
 // fallback)`) so consumers can theme via `[role="dialog"]`,
 // `[data-wc-modal]`, a parent element, or `:root`. The
-// `@monolithlabs/wallet-connect-ui` package injects the variable
+// `@monolithlabs-hub/wallet-connect-ui` package injects the variable
 // defaults and the hover / focus-visible / disabled rules on first
 // `attachModal` call.
 

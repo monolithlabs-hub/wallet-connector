@@ -1,5 +1,5 @@
-import type { WalletManagerConfig } from '@monolithlabs/wallet-connect-core'
-import { ConnectButton, WalletConnectProvider } from '@monolithlabs/wallet-connect-react'
+import type { WalletManagerConfig } from '@monolithlabs-hub/wallet-connect-core'
+import { ConnectButton, WalletConnectProvider } from '@monolithlabs-hub/wallet-connect-react'
 import { useEffect, useState } from 'react'
 
 import { WalletInfo } from './WalletInfo'
@@ -63,8 +63,9 @@ export function App() {
       <header style={headerStyle}>
         <h1 style={titleStyle}>wallet-connect example</h1>
         <p style={leadStyle}>
-          Live demos of <code>@monolithlabs/wallet-connect-react</code>. Pick a scenario from the
-          navigation, click <strong>Connect Wallet</strong>, and watch the flow state update inline.
+          Live demos of <code>@monolithlabs-hub/wallet-connect-react</code>. Pick a scenario from
+          the navigation, click <strong>Connect Wallet</strong>, and watch the flow state update
+          inline.
         </p>
         <nav style={navStyle} aria-label="Demos">
           {ROUTES.map((r) => (

@@ -1,0 +1,5 @@
+---
+'@monolithlabs-hub/wallet-connect-core': minor
+---
+
+TASK-104 — add the flow `FlowMachine` to `@monolithlabs-hub/wallet-connect-core`. States: `idle | connecting | connected | signing | authenticated | error`. Events: `CONNECT_INITIATED`, `WALLET_CONNECTED`, `SIGN_INITIATED`, `SIGN_COMPLETED`, `ERROR`, `RESET`. `ERROR` is accepted from any non-error state; `RESET` is accepted from any state and clears the context. `WALLET_CONNECTED` with `requireSignIn: false` auto-advances through `connected` to `authenticated` (subscribers see both transitions). Invalid transitions throw with a descriptive message that names the event and the current/expected states. `toJSON()` produces a JSON-safe snapshot that `createFlowMachine(snapshot)` can replay — used by the `WalletManager` to resume a mobile flow after the deep-link round-trip. Errors round-trip via `{ name, message }` and are restored as `WalletError` instances. Exposes `createFlowMachine`, `FlowState`, `FlowEvent`, `FlowContext`, `FlowMachine`, `SerializedFlow`, `StateListener`, and `Unsubscribe`.

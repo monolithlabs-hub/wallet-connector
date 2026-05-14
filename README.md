@@ -1,12 +1,10 @@
-# @monolithlabs/wallet-connect
+# @monolithlabs-hub/wallet-connect
 
-[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/@monolithlabs/wallet-connect-react.svg?label=npm%20%40monolithlabs%2Fwallet-connect-react)](https://www.npmjs.com/package/@monolithlabs/wallet-connect-react)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](#license)
+[![CI](https://github.com/monolithlabs-hub/wallet-connector/actions/workflows/ci.yml/badge.svg)](https://github.com/monolithlabs-hub/wallet-connector/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@monolithlabs-hub/wallet-connect-react.svg?label=npm%20%40monolithlabs%2Fwallet-connect-react)](https://www.npmjs.com/package/@monolithlabs-hub/wallet-connect-react)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](#license)
 
 A Solana wallet-connect library for React and Vue. Collapses **pick wallet → connect → sign in** into a single button that works the same on a desktop with a browser extension and on a mobile browser via deep links. Sign-In With Solana is built in; on mobile the SIWS message is bundled into the connect deep link for wallets that consume it (Solflare, Backpack), forward-compatible with wallets that don't yet (Phantom — see the wallet table footnotes).
-
-> The badges above use `OWNER/REPO` as a placeholder. Replace it with the actual GitHub `<owner>/<repo>` slug once the remote is provisioned.
 
 ## Highlights
 
@@ -14,19 +12,19 @@ A Solana wallet-connect library for React and Vue. Collapses **pick wallet → c
 - Wallet Standard under the hood for desktop connect flows — works with every Wallet Standard-compatible wallet you list in `wallets[]`.
 - Sign-In With Solana (SIWS) as a single config flag; bundled into the mobile redirect for wallets that accept it.
 - Framework parity between React and Vue: same `useWallet()` shape, same `<ConnectButton>` props.
-- Framework-agnostic core (`@monolithlabs/wallet-connect-core`) for non-React/Vue stacks.
+- Framework-agnostic core (`@monolithlabs-hub/wallet-connect-core`) for non-React/Vue stacks.
 
 ## Install
 
 ```bash
 # React
-npm install @monolithlabs/wallet-connect-react
+npm install @monolithlabs-hub/wallet-connect-react
 
 # Vue
-npm install @monolithlabs/wallet-connect-vue
+npm install @monolithlabs-hub/wallet-connect-vue
 ```
 
-Peer dependencies: `react >= 19` / `react-dom >= 19` for the React package, `vue ^3.5` for the Vue package. The framework package pulls in `@monolithlabs/wallet-connect-core` automatically.
+Peer dependencies: `react >= 19` / `react-dom >= 19` for the React package, `vue ^3.5` for the Vue package. The framework package pulls in `@monolithlabs-hub/wallet-connect-core` automatically.
 
 ## Usage
 
@@ -39,8 +37,8 @@ import {
   asWalletName,
   type WalletConfig,
   type WalletManagerConfig,
-} from '@monolithlabs/wallet-connect-core'
-import { ConnectButton, WalletConnectProvider } from '@monolithlabs/wallet-connect-react'
+} from '@monolithlabs-hub/wallet-connect-core'
+import { ConnectButton, WalletConnectProvider } from '@monolithlabs-hub/wallet-connect-react'
 
 const PHANTOM: WalletConfig = {
   id: 'phantom',
@@ -74,8 +72,8 @@ import {
   asWalletName,
   type WalletConfig,
   type WalletManagerConfig,
-} from '@monolithlabs/wallet-connect-core'
-import { WalletConnectPlugin } from '@monolithlabs/wallet-connect-vue'
+} from '@monolithlabs-hub/wallet-connect-core'
+import { WalletConnectPlugin } from '@monolithlabs-hub/wallet-connect-vue'
 import { createApp } from 'vue'
 
 import App from './App.vue'
@@ -102,7 +100,7 @@ createApp(App).use(WalletConnectPlugin, config).mount('#app')
 ```vue
 <!-- App.vue -->
 <script setup lang="ts">
-import { ConnectButton } from '@monolithlabs/wallet-connect-vue'
+import { ConnectButton } from '@monolithlabs-hub/wallet-connect-vue'
 </script>
 
 <template>
@@ -150,7 +148,7 @@ The default `WalletManagerConfig` pins Opindex to position 0 on mobile (always) 
 To disable:
 
 ```ts
-import type { WalletManagerConfig } from '@monolithlabs/wallet-connect-core'
+import type { WalletManagerConfig } from '@monolithlabs-hub/wallet-connect-core'
 
 const config: WalletManagerConfig = {
   wallets: [],
@@ -171,17 +169,17 @@ The full transparency disclosure, including the second-order effects of disablin
 
 Runnable reference app:
 
-- `examples/vue-example/` — Vite + Vue 3.5 demo with four scenarios (basic connect, SIWS, custom priority, neutral mode). Run with `pnpm --filter @monolithlabs/wallet-connect-vue-example dev`.
+- `examples/vue-example/` — Vite + Vue 3.5 demo with four scenarios (basic connect, SIWS, custom priority, neutral mode). Run with `pnpm --filter @monolithlabs-hub/wallet-connect-vue-example dev`.
 
 A matching React example is planned (PLAN.md TASK-601).
 
 ## License
 
-Apache License 2.0. The library ports a small set of files from the [`@solana/wallet-adapter`](https://github.com/anza-xyz/wallet-adapter) ecosystem (Apache-2.0); per-file attribution headers and the consolidated list live in `NOTICE` and `THIRD_PARTY_LICENSES.md`.
+MIT, see [`LICENSE`](./LICENSE). The `@monolithlabs-hub/wallet-connect-core` package additionally ports a small set of files from the [`@solana/wallet-adapter`](https://github.com/anza-xyz/wallet-adapter) ecosystem (Apache-2.0); per-file attribution headers and the consolidated list live in [`NOTICE`](./NOTICE) and [`THIRD_PARTY_LICENSES.md`](./THIRD_PARTY_LICENSES.md), both of which ship inside the published `core` tarball.
 
 ## Theming the modal
 
-`<ConnectButton>` reads every visual value from a CSS custom property with an inline `var(--wc-foo, fallback)` fallback. Set the variable on `:root`, on `[role="dialog"]`, on `[data-wc-modal]`, or on any ancestor — the cascade flows through. Hover and focus-visible rules are injected once into `<head>` by `attachModal()` from `@monolithlabs/wallet-connect-ui`.
+`<ConnectButton>` reads every visual value from a CSS custom property with an inline `var(--wc-foo, fallback)` fallback. Set the variable on `:root`, on `[role="dialog"]`, on `[data-wc-modal]`, or on any ancestor — the cascade flows through. Hover and focus-visible rules are injected once into `<head>` by `attachModal()` from `@monolithlabs-hub/wallet-connect-ui`.
 
 | Variable             | Default                          | Where it applies                         |
 | -------------------- | -------------------------------- | ---------------------------------------- |

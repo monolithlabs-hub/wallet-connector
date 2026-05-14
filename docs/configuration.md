@@ -2,10 +2,13 @@
 
 Every public option on `WalletManagerConfig` and `WalletConfig`, plus the lifecycle callbacks. Each row gives the type, the default, and an example.
 
-The single public entry point is `createWalletManager(config)` from `@monolithlabs/wallet-connect-core`. Both the React Provider and the Vue Plugin take the same `WalletManagerConfig` and pass it through.
+The single public entry point is `createWalletManager(config)` from `@monolithlabs-hub/wallet-connect-core`. Both the React Provider and the Vue Plugin take the same `WalletManagerConfig` and pass it through.
 
 ```ts
-import { createWalletManager, type WalletManagerConfig } from '@monolithlabs/wallet-connect-core'
+import {
+  createWalletManager,
+  type WalletManagerConfig,
+} from '@monolithlabs-hub/wallet-connect-core'
 
 const manager = createWalletManager({
   wallets: [

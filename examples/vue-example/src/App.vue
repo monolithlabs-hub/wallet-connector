@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { WalletManagerConfig } from '@monolithlabs/wallet-connect-core'
-import { ConnectButton } from '@monolithlabs/wallet-connect-vue'
+import type { WalletManagerConfig } from '@monolithlabs-hub/wallet-connect-core'
+import { ConnectButton } from '@monolithlabs-hub/wallet-connect-vue'
 import { computed, onMounted, onUnmounted, ref, type CSSProperties } from 'vue'
 
 import DemoProvider from './components/DemoProvider.vue'
@@ -243,7 +243,7 @@ const sectionBodyStyle: CSSProperties = {
     <header :style="headerStyle">
       <h1 :style="titleStyle">wallet-connect example (Vue)</h1>
       <p :style="leadStyle">
-        Live demos of <code>@monolithlabs/wallet-connect-vue</code>. Pick a scenario from the
+        Live demos of <code>@monolithlabs-hub/wallet-connect-vue</code>. Pick a scenario from the
         navigation, click <strong>Connect Wallet</strong>, and watch the flow state update
         inline.
       </p>

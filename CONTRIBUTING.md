@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for working on `@monolithlabs/wallet-connect`. This document covers the only piece of process that's enforced in this repo: **changesets**.
+Thanks for working on `@monolithlabs-hub/wallet-connect`. This document covers the only piece of process that's enforced in this repo: **changesets**.
 
 ## TL;DR
 
@@ -41,11 +41,11 @@ When in doubt, add a versioned one — an extra patch bump is cheap.
 
 ## Linked packages
 
-`@monolithlabs/wallet-connect-ui`, `@monolithlabs/wallet-connect-react`, and `@monolithlabs/wallet-connect-vue` are configured as a **linked group** in `.changeset/config.json`. Practically:
+`@monolithlabs-hub/wallet-connect-ui`, `@monolithlabs-hub/wallet-connect-react`, and `@monolithlabs-hub/wallet-connect-vue` are configured as a **linked group** in `.changeset/config.json`. Practically:
 
 - Each PR can choose a different bump type per package (e.g., minor for `react`, patch for `vue`, none for `ui`).
 - When the release PR is cut, all three packages jump to the same final version (the highest of the three bumps).
-- `@monolithlabs/wallet-connect-core` versions **independently** of the framework packages.
+- `@monolithlabs-hub/wallet-connect-core` versions **independently** of the framework packages.
 
 ## Release flow
 

@@ -7,7 +7,7 @@ import {
   type SolanaSignInOutput,
   type WalletListEntry,
   type WalletError,
-} from '@monolithlabs/wallet-connect-core'
+} from '@monolithlabs-hub/wallet-connect-core'
 import { computed, onMounted, onUnmounted, ref, shallowRef, type ComputedRef, type Ref } from 'vue'
 
 import { useWalletContext } from '../context/use-wallet-context'
@@ -15,7 +15,7 @@ import { useWalletContext } from '../context/use-wallet-context'
 /**
  * Return shape of {@link useWallet}.
  *
- * Mirrors `@monolithlabs/wallet-connect-react`'s `useWallet` return where
+ * Mirrors `@monolithlabs-hub/wallet-connect-react`'s `useWallet` return where
  * the semantics overlap, with Vue-flavored reactivity wrappers: `Ref` for
  * read-write state, `ComputedRef` for everything else. The composable is
  * usable in `<script setup>` and the explicit `setup()` form alike.

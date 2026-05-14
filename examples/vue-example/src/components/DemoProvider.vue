@@ -2,8 +2,8 @@
 import {
   createWalletManager,
   type WalletManagerConfig,
-} from '@monolithlabs/wallet-connect-core'
-import { WalletConnectInjectionKey } from '@monolithlabs/wallet-connect-vue'
+} from '@monolithlabs-hub/wallet-connect-core'
+import { WalletConnectInjectionKey } from '@monolithlabs-hub/wallet-connect-vue'
 import { onUnmounted, provide } from 'vue'
 
 /**
