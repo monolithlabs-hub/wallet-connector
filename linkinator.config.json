@@ -1,9 +1,7 @@
 {
   "concurrency": 10,
   "retry": true,
-  "linksToSkip": [
-    "^http://localhost",
-    "^https?://127\\.0\\.0\\.1",
+  "skip": [
     "^https?://example\\.com",
     "^https?://myapp\\.example",
     "^https?://opindex\\.app",

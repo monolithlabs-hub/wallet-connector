@@ -1,27 +1,29 @@
 #!/usr/bin/env node
 /**
- * Walk every .md file under docs/ (plus the root README.md when present)
- * and run linkinator against each. Exits non-zero if any file has a
- * broken link.
+ * Walk every .md file under docs/ (plus the root README.md when
+ * present) and run linkinator against each. Exits non-zero if any file
+ * has a broken link.
  *
- * Why a Node wrapper around the linkinator CLI?
- *  - linkinator can scan one location at a time. The wrapper handles the
- *    per-file iteration in a portable way (no shell-specific globbing).
- *  - Aggregating the exit code lets us walk every file even when an
- *    earlier file has broken links — the user sees them all in one run
- *    instead of finding-and-fixing one at a time.
- *
- * linkinator config (ignored URL patterns, retry behavior) lives at
- * `linkinator.config.json` at the repo root.
+ * Uses linkinator's Node API rather than the CLI because the CLI
+ * doesn't honor the `linksToSkip` field from a config file (only the
+ * repeated `--skip` flags). The skip patterns live next to this script
+ * (or, alternatively, in `linkinator.config.json` for ad-hoc CLI runs).
  */
 
-import { execSync } from 'node:child_process'
 import { existsSync, readdirSync, statSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { LinkChecker } from 'linkinator'
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const configPath = join(repoRoot, 'linkinator.config.json')
+
+const config = JSON.parse(await readFile(configPath, 'utf8'))
+const linksToSkip = config.skip ?? config.linksToSkip ?? []
+const retry = config.retry ?? false
+const concurrency = config.concurrency ?? 10
 
 function collectMarkdown(dir) {
   const out = []
@@ -48,17 +50,40 @@ if (targets.length === 0) {
 }
 
 let failed = false
+const checker = new LinkChecker()
+
+// Switch into repo root so relative paths (the form linkinator's markdown
+// loader expects) resolve correctly.
+process.chdir(repoRoot)
+
 for (const file of targets) {
   const rel = relative(repoRoot, file)
   process.stdout.write(`\n→ Checking ${rel}\n`)
-  try {
-    execSync(
-      `pnpm exec linkinator --markdown --config ${JSON.stringify(configPath)} ${JSON.stringify(file)}`,
-      { stdio: 'inherit', cwd: repoRoot },
-    )
-  } catch {
-    failed = true
+
+  const result = await checker.check({
+    path: rel,
+    markdown: true,
+    linksToSkip,
+    retry,
+    concurrency,
+  })
+
+  let skipped = 0
+  let broken = 0
+  for (const link of result.links) {
+    if (link.state === 'SKIPPED') {
+      skipped += 1
+      console.log(`  [skip] ${link.url}`)
+    } else if (link.state === 'BROKEN') {
+      broken += 1
+      console.log(`  [${link.status ?? '?'}] ${link.url}`)
+    } else {
+      console.log(`  [${link.status}] ${link.url}`)
+    }
   }
+  console.log(`  → ${result.links.length} link(s), ${skipped} skipped, ${broken} broken`)
+
+  if (!result.passed) failed = true
 }
 
 process.exit(failed ? 1 : 0)
