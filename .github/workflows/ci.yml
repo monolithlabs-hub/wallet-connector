@@ -75,6 +75,10 @@ jobs:
 
   size:
     name: Bundle size
+    # andresz1/size-limit-action diffs the PR head against the base branch and
+    # has nowhere to post the comment outside of a pull_request event, so only
+    # run this job on PRs. Push events to `main` (post-merge) are skipped.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
