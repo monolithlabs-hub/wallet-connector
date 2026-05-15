@@ -1,6 +1,6 @@
 {
   "name": "@monolithlabs-hub/wallet-connect-vue",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Vue 3 bindings for @monolithlabs-hub/wallet-connect: useWallet() composable, WalletConnectPlugin, and a ready-made <ConnectButton/> with SIWS support.",
   "keywords": [
     "solana",
