@@ -987,25 +987,45 @@ describe('createWalletManager — use after destroy', () => {
     mocks.detectPlatform.mockReturnValue(DESKTOP_PLATFORM)
   })
 
-  it.each<['connect' | 'disconnect' | 'initialize' | 'subscribe']>([
-    ['connect'],
-    ['disconnect'],
-    ['initialize'],
-    ['subscribe'],
-  ])('throws when %s is called after destroy()', async (method) => {
+  // Mutating methods (connect/disconnect/signMessage/signIn) throw after
+  // destroy — they're user-initiated and a throw catches real bugs.
+  it.each<['connect' | 'disconnect']>([['connect'], ['disconnect']])(
+    'throws when %s is called after destroy()',
+    async (method) => {
+      mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([]))
+      const manager = createWalletManager({ wallets: [PHANTOM] })
+      manager.destroy()
+
+      if (method === 'connect') {
+        await expect(manager.connect('phantom')).rejects.toThrow(/has been destroyed/)
+      } else {
+        await expect(manager.disconnect()).rejects.toThrow(/has been destroyed/)
+      }
+    },
+  )
+
+  // Observer methods (initialize/subscribe) are lenient — they no-op after
+  // destroy so React StrictMode's effect-cleanup-then-reuse cycle doesn't
+  // throw.
+  it('initialize() is a no-op after destroy() and does NOT throw', () => {
     mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([]))
     const manager = createWalletManager({ wallets: [PHANTOM] })
     manager.destroy()
 
-    if (method === 'connect') {
-      await expect(manager.connect('phantom')).rejects.toThrow(/has been destroyed/)
-    } else if (method === 'disconnect') {
-      await expect(manager.disconnect()).rejects.toThrow(/has been destroyed/)
-    } else if (method === 'initialize') {
-      expect(() => manager.initialize()).toThrow(/has been destroyed/)
-    } else {
-      expect(() => manager.subscribe(() => {})).toThrow(/has been destroyed/)
-    }
+    expect(() => manager.initialize()).not.toThrow()
+  })
+
+  it('subscribe() returns a no-op unsubscribe after destroy() and does NOT throw', () => {
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([]))
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+    manager.destroy()
+
+    let unsubscribe: (() => void) | null = null
+    expect(() => {
+      unsubscribe = manager.subscribe(() => {})
+    }).not.toThrow()
+    expect(typeof unsubscribe).toBe('function')
+    expect(() => unsubscribe?.()).not.toThrow()
   })
 
   it('destroy() is idempotent', () => {
@@ -1016,6 +1036,30 @@ describe('createWalletManager — use after destroy', () => {
       manager.destroy()
       manager.destroy()
     }).not.toThrow()
+  })
+
+  it('isDestroyed() returns false on a fresh manager', () => {
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([]))
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+
+    expect(manager.isDestroyed()).toBe(false)
+  })
+
+  it('isDestroyed() returns true after destroy()', () => {
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([]))
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+    manager.destroy()
+
+    expect(manager.isDestroyed()).toBe(true)
+  })
+
+  it('isDestroyed() stays true across repeated destroy() calls', () => {
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([]))
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+    manager.destroy()
+    manager.destroy()
+
+    expect(manager.isDestroyed()).toBe(true)
   })
 })
 

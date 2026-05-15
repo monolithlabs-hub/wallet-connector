@@ -74,6 +74,24 @@ export function WalletConnectProvider({ config, children }: WalletConnectProvide
   }
 
   useEffect(() => {
+    // StrictMode-safe rebuild: in dev, React runs effect setup → cleanup
+    // → setup on first mount. The cleanup `m.destroy()` destroys the
+    // manager, then the re-setup runs against the same `useState`-stored
+    // instance. Detect that case and rebuild via `setState` — the
+    // re-render picks up the fresh manager and the effect installs a new
+    // cleanup against it. Production never enters this branch.
+    //
+    // The eslint rule below would normally flag setState-in-effect as a
+    // smell — and it is, except when the setState is correcting a
+    // dependency-mirrored state slot to match an external-system
+    // observation that can only be made post-commit. That's exactly
+    // this case: `isDestroyed()` only becomes true after the cleanup
+    // fires, which is necessarily inside the effect lifecycle.
+    if (state.manager.isDestroyed()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setState((s) => ({ ...s, manager: createWalletManager(s.config) }))
+      return
+    }
     const m = state.manager
     return () => {
       m.destroy()

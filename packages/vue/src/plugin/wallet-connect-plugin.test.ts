@@ -59,6 +59,7 @@ function makeFakeManager(): FakeManager {
     }),
     getVersion: () => 0,
     subscribe: (listener) => machine.subscribe(listener),
+    isDestroyed: () => false,
     destroy: destroySpy,
   }
   return { manager, machine, destroySpy }

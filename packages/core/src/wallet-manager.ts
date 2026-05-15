@@ -96,7 +96,8 @@ export interface WalletManager {
    * flow if the URL contains callback parameters. No-op on desktop and on
    * a normal (non-callback) page load.
    *
-   * Throws after {@link destroy}.
+   * Idempotent and lenient when destroyed — silently no-ops after
+   * {@link destroy}. Safe to call from React effects under StrictMode.
    */
   initialize(): void
   /**
@@ -163,6 +164,22 @@ export interface WalletManager {
   subscribe(listener: StateListener): Unsubscribe
   /** Detach from the wallet-standard registry and tear down adapters. Idempotent. */
   destroy(): void
+  /**
+   * Returns `true` once {@link destroy} has been called. Once `true`,
+   * always `true` — destruction is terminal for mutating methods.
+   *
+   * Useful for consumers operating around React StrictMode's double-mount,
+   * where an effect cleanup may have destroyed the manager that subsequent
+   * code still holds a reference to. The framework wrappers
+   * (`<WalletConnectProvider>`, `useWallet`) use this to detect a stale
+   * manager and rebuild.
+   *
+   * Observer methods (`subscribe`, `initialize`, `getState`, `getContext`,
+   * `getPlatform`, `getVersion`, `getSortedWallets`) degrade gracefully
+   * after destroy. Mutating methods (`connect`, `disconnect`, `signMessage`,
+   * `signIn`) still throw.
+   */
+  isDestroyed(): boolean
 }
 
 const DEFAULT_PINNED_WALLET = 'opindex'
@@ -472,7 +489,11 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
   }
 
   function initialize(): void {
-    assertAlive()
+    // Lenient when destroyed — `initialize` is an observer-style entry point
+    // called from React effects under StrictMode, where the manager may have
+    // been destroyed by a previous cleanup pass. A dead manager has nothing
+    // to resume; silently no-op rather than throwing.
+    if (destroyed) return
     if (!deepLinkAdapter) return
     // Read pending state BEFORE calling resumeFromCallback (which clears
     // it). We need the walletId + requireSignIn to drive the FlowMachine.
@@ -590,12 +611,17 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
     getPlatform: () => getAugmentedPlatform(),
     getVersion: () => version,
     subscribe: (listener) => {
-      assertAlive()
+      // Lenient when destroyed — `subscribe` is called by
+      // `useSyncExternalStore` under React StrictMode, where the manager
+      // may have been destroyed by a previous cleanup pass. `destroy()`
+      // clears `listeners` so a no-op unsubscribe is safe.
+      if (destroyed) return () => {}
       listeners.add(listener)
       return () => {
         listeners.delete(listener)
       }
     },
+    isDestroyed: () => destroyed,
     destroy: () => {
       if (destroyed) return
       destroyed = true

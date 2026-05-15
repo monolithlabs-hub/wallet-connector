@@ -102,15 +102,35 @@ export function useWallet(config?: WalletManagerConfig): UseWalletReturn {
   // Lazy-init so the side-effecting factory (which subscribes to the
   // global Wallet-Standard registry) runs exactly once per mount. React
   // is allowed to drop a useMemo cache; useState's initializer is not.
-  const [ownedManager] = useState<WalletManager | null>(() =>
+  const [ownedManager, setOwnedManager] = useState<WalletManager | null>(() =>
     config ? createWalletManager(config) : null,
   )
 
   useEffect(() => {
-    return () => {
-      if (ownedManager) ownedManager.destroy()
+    if (!ownedManager) return
+    // StrictMode-safe rebuild: in dev, React runs effect setup → cleanup
+    // → setup on first mount. The cleanup `m.destroy()` destroys the
+    // manager, then the re-setup runs against the same `useState`-stored
+    // instance. Detect that case and rebuild via `setOwnedManager` — the
+    // re-render picks up the fresh manager and the effect installs a new
+    // cleanup against it. Production never enters this branch.
+    //
+    // setState-in-effect is fine here for the same reason it's fine in
+    // `WalletConnectProvider`: `isDestroyed()` only becomes true after
+    // the cleanup fires, which is necessarily inside the effect
+    // lifecycle. `config` is locked at first mount (documented above) —
+    // when `ownedManager` is non-null, `config` was provided then, so
+    // the non-null assertion is safe.
+    if (ownedManager.isDestroyed()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setOwnedManager(createWalletManager(config!))
+      return
     }
-  }, [ownedManager])
+    const m = ownedManager
+    return () => {
+      m.destroy()
+    }
+  }, [ownedManager, config])
 
   const manager = contextManager ?? ownedManager
   if (!manager) {
