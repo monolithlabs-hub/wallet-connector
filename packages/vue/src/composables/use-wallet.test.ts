@@ -108,6 +108,7 @@ function makeMockManager(wallets: WalletListEntry[] = [PHANTOM, SOLFLARE]): Mock
         listeners.delete(listener)
       }
     },
+    isDestroyed: () => false,
     destroy: vi.fn(),
   }
 

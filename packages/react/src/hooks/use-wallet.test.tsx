@@ -6,13 +6,35 @@ import {
   type WalletListEntry,
   type WalletManager,
 } from '@monolithlabs-hub/wallet-connect-core'
-import { act, renderHook } from '@testing-library/react'
+import { act, render, renderHook } from '@testing-library/react'
 import { StrictMode, type ReactNode } from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { WalletConnectContext } from '../context/wallet-connect-context'
 
 import { useWallet } from './use-wallet'
+
+// Hoisted mock for `createWalletManager` — only consumed by the
+// owned-manager-path StrictMode tests at the bottom of this file. All
+// other tests inject their own fake via `WalletConnectContext.Provider`
+// and never hit this code path.
+const mocks = vi.hoisted(() => ({
+  createWalletManager: vi.fn(),
+}))
+
+vi.mock('@monolithlabs-hub/wallet-connect-core', async () => {
+  const actual = await vi.importActual<typeof import('@monolithlabs-hub/wallet-connect-core')>(
+    '@monolithlabs-hub/wallet-connect-core',
+  )
+  return {
+    ...actual,
+    createWalletManager: mocks.createWalletManager,
+  }
+})
+
+beforeEach(() => {
+  mocks.createWalletManager.mockReset()
+})
 
 const PHANTOM: WalletListEntry = {
   id: 'phantom',
@@ -72,6 +94,7 @@ function makeMockManager(wallets: WalletListEntry[] = [PHANTOM, SOLFLARE]): Mock
   const signMessageSpy = vi.fn(async () => new Uint8Array([1, 2, 3]))
   const signInSpy = vi.fn()
   const unsubscribeSpy = vi.fn()
+  let destroyed = false
 
   let platform: PlatformInfo = DEFAULT_PLATFORM
   let version = 0
@@ -97,13 +120,18 @@ function makeMockManager(wallets: WalletListEntry[] = [PHANTOM, SOLFLARE]): Mock
     getPlatform: () => platform,
     getVersion: () => version,
     subscribe: (listener) => {
+      // Mirror the real manager's lenient-when-destroyed behavior.
+      if (destroyed) return () => {}
       listeners.add(listener)
       return () => {
         unsubscribeSpy()
         listeners.delete(listener)
       }
     },
-    destroy: vi.fn(),
+    isDestroyed: () => destroyed,
+    destroy: vi.fn(() => {
+      destroyed = true
+    }),
   }
 
   return {
@@ -510,5 +538,50 @@ describe('useWallet', () => {
     })
 
     expect(result.current.platform.hasOpindexExtension).toBe(true)
+  })
+
+  it('owned-manager path survives a React StrictMode mount cycle', () => {
+    // useWallet(config) self-owns a manager. Under StrictMode the effect
+    // cleanup destroys it mid-cycle; the second mount must detect that
+    // and rebuild via `createWalletManager` rather than calling
+    // `initialize()` / `subscribe()` on a dead instance.
+    //
+    // StrictMode double-invokes useState lazy initializers + setState
+    // updaters for purity checks, so createWalletManager is called more
+    // than twice. Invariants we care about:
+    //   - Rebuild happened (>= 2 distinct managers created).
+    //   - At least one earlier manager was destroyed.
+    //   - The final live manager has its `initialize()` called.
+    //
+    // Uses `render(...)` rather than `renderHook(...)` because the latter
+    // doesn't synchronously complete StrictMode's effect cleanup-then-
+    // rerun cycle before returning under React 19 + @testing-library 16.
+    const created: ReturnType<typeof makeMockManager>[] = []
+    mocks.createWalletManager.mockImplementation(() => {
+      const m = makeMockManager()
+      created.push(m)
+      return m.manager
+    })
+
+    let observedState: string | null = null
+    function HookProbe() {
+      const w = useWallet({ wallets: [] })
+      observedState = w.state
+      return null
+    }
+
+    render(
+      <StrictMode>
+        <HookProbe />
+      </StrictMode>,
+    )
+
+    expect(created.length).toBeGreaterThanOrEqual(2)
+    expect(created.some((m) => m.manager.isDestroyed())).toBe(true)
+    const finalAlive = created.filter((m) => !m.manager.isDestroyed())
+    expect(finalAlive.length).toBeGreaterThanOrEqual(1)
+    // The final live manager has been initialized.
+    expect(finalAlive[finalAlive.length - 1]?.initializeSpy).toHaveBeenCalled()
+    expect(observedState).toBe('idle')
   })
 })

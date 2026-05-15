@@ -5,7 +5,7 @@ import {
   type WalletManagerConfig,
 } from '@monolithlabs-hub/wallet-connect-core'
 import { render, renderHook } from '@testing-library/react'
-import { type ReactNode, useEffect, useRef } from 'react'
+import { StrictMode, type ReactNode, useEffect, useRef } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useWallet } from '../hooks/use-wallet'
@@ -39,7 +39,10 @@ interface FakeManager {
 
 function makeFakeManager(): FakeManager {
   const machine = createFlowMachine()
-  const destroySpy = vi.fn()
+  let destroyed = false
+  const destroySpy = vi.fn(() => {
+    destroyed = true
+  })
   const manager: WalletManager = {
     initialize: vi.fn(),
     connect: vi.fn(async () => undefined),
@@ -58,7 +61,11 @@ function makeFakeManager(): FakeManager {
       strategy: 'install-prompt',
     }),
     getVersion: () => 0,
-    subscribe: (listener) => machine.subscribe(listener),
+    subscribe: (listener) => {
+      if (destroyed) return () => {}
+      return machine.subscribe(listener)
+    },
+    isDestroyed: () => destroyed,
     destroy: destroySpy,
   }
   return { manager, machine, destroySpy }
@@ -241,6 +248,66 @@ describe('WalletConnectProvider', () => {
     // The previous manager must be destroyed when the new one takes over.
     expect(first.destroySpy).toHaveBeenCalledTimes(1)
     expect(second.destroySpy).not.toHaveBeenCalled()
+  })
+
+  it('survives a React StrictMode mount cycle and ends up with a live manager', () => {
+    // StrictMode runs mount → cleanup → mount on first commit AND
+    // double-invokes useState lazy initializers + setState updaters for
+    // its purity checks. So `createWalletManager` will be called more
+    // than twice; the invariants we care about are:
+    //   - The Provider rebuilt at least once (>= 2 distinct managers).
+    //   - The manager exposed via context at the end is alive.
+    //   - At least one prior manager was destroyed (cleanup ran).
+    const created: ReturnType<typeof makeFakeManager>[] = []
+    mocks.createWalletManager.mockImplementation(() => {
+      const fake = makeFakeManager()
+      created.push(fake)
+      return fake.manager
+    })
+
+    let observed: WalletManager | null = null
+    function Probe() {
+      observed = useWalletContext()
+      return null
+    }
+
+    render(
+      <StrictMode>
+        <WalletConnectProvider config={DUMMY_CONFIG}>
+          <Probe />
+        </WalletConnectProvider>
+      </StrictMode>,
+    )
+
+    expect(created.length).toBeGreaterThanOrEqual(2)
+    expect(observed).not.toBeNull()
+    // The final observed manager must be alive.
+    expect((observed as unknown as WalletManager).isDestroyed()).toBe(false)
+    // At least one previously-created manager was destroyed by cleanup.
+    expect(created.some((c) => c.manager !== observed && c.manager.isDestroyed())).toBe(true)
+  })
+
+  it('does not throw "WalletManager has been destroyed" under StrictMode', () => {
+    // Regression: the bug we're fixing throws this exact error from
+    // useWallet's `manager.initialize()` call when StrictMode re-mounts
+    // after a cleanup. Render the whole stack under StrictMode and assert
+    // React's error-boundary path never logs the message.
+    mocks.createWalletManager.mockImplementation(() => makeFakeManager().manager)
+
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      render(
+        <StrictMode>
+          <WalletConnectProvider config={DUMMY_CONFIG}>
+            <span />
+          </WalletConnectProvider>
+        </StrictMode>,
+      )
+      const args = errSpy.mock.calls.flat().map((v) => (typeof v === 'string' ? v : ''))
+      expect(args.join('\n')).not.toMatch(/WalletManager has been destroyed/)
+    } finally {
+      errSpy.mockRestore()
+    }
   })
 
   it('does NOT recreate the manager when the config reference is stable across re-renders', () => {

@@ -146,6 +146,7 @@ function makeMockManager(opts: {
         listeners.delete(listener)
       }
     },
+    isDestroyed: () => false,
     destroy: vi.fn(),
   }
 
