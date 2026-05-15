@@ -371,7 +371,9 @@ describe('Security — callback adversarial payloads', () => {
     // the decode is slow but not exploitable: the attacker would need
     // to phish the user into a callback URL they constructed, by which
     // point they have far easier attack surface. Documented as accepted
-    // in the TASK-701 audit notes.
+    // in the TASK-701 audit notes. The 30s vitest timeout below covers
+    // slower CI runners; one call (not two) keeps the test fast in
+    // practice while still proving the no-throw + null contract.
     const dapp = generateEphemeralKeypair()
     const big = nacl.randomBytes(4 * 1024)
     const url = new URL(DAPP_BASE)
@@ -379,9 +381,12 @@ describe('Security — callback adversarial payloads', () => {
     url.searchParams.set('nonce', bs58.encode(new Uint8Array(24)))
     url.searchParams.set('data', bs58.encode(big))
 
-    expect(() => parseCallback(url.toString(), dapp)).not.toThrow()
-    expect(parseCallback(url.toString(), dapp)).toBeNull()
-  })
+    let result: ReturnType<typeof parseCallback> | undefined
+    expect(() => {
+      result = parseCallback(url.toString(), dapp)
+    }).not.toThrow()
+    expect(result).toBeNull()
+  }, 30_000)
 
   it('returns null on truncated ciphertext (decode succeeds, decryption fails)', () => {
     const dapp = generateEphemeralKeypair()
