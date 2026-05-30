@@ -53,7 +53,7 @@
   },
   "publishConfig": {
     "access": "public",
-    "provenance": true
+    "provenance": false
   },
   "scripts": {
     "build": "tsup && vue-tsc -p tsconfig.build.json",
