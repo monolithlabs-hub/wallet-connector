@@ -49,7 +49,13 @@ jobs:
       # expands it from the env at publish time. Written to $HOME (not the
       # repo root) so the version-bump commit can't pick it up.
       - name: Configure npm authentication
-        run: printf '//registry.npmjs.org/:_authToken=${NPM_TOKEN}\n' > "$HOME/.npmrc"
+        run: |
+          printf '//registry.npmjs.org/:_authToken=${NPM_TOKEN}\n' > "$HOME/.npmrc"
+          # Diagnostic: confirm the token authenticates and print WHICH npm
+          # account it resolves to. A publish E403 means this account lacks
+          # write access to the @monolithlabs-hub packages — compare this
+          # name against the package owners on npm.
+          echo "Publishing to npm as: $(npm whoami)"
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
