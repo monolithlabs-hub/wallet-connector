@@ -49,6 +49,8 @@ function makeFakeManager(): FakeManager {
     disconnect: vi.fn(async () => undefined),
     signMessage: vi.fn(async () => new Uint8Array()),
     signIn: vi.fn(),
+    signTransaction: vi.fn(async () => new Uint8Array()),
+    signAndSendTransaction: vi.fn(async () => ({ signature: new Uint8Array() })),
     getState: () => machine.getState(),
     getContext: () => machine.getContext(),
     getSortedWallets: () => [],

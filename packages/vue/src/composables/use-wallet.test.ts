@@ -62,6 +62,8 @@ interface MockManager {
   disconnectSpy: ReturnType<typeof vi.fn>
   signMessageSpy: ReturnType<typeof vi.fn>
   signInSpy: ReturnType<typeof vi.fn>
+  signTransactionSpy: ReturnType<typeof vi.fn>
+  signAndSendTransactionSpy: ReturnType<typeof vi.fn>
   unsubscribeSpy: ReturnType<typeof vi.fn>
   setPlatform: (next: PlatformInfo) => void
   notifyRegistryChange: () => void
@@ -78,6 +80,8 @@ function makeMockManager(wallets: WalletListEntry[] = [PHANTOM, SOLFLARE]): Mock
   })
   const signMessageSpy = vi.fn(async () => new Uint8Array([1, 2, 3]))
   const signInSpy = vi.fn()
+  const signTransactionSpy = vi.fn(async () => new Uint8Array([4, 5, 6]))
+  const signAndSendTransactionSpy = vi.fn(async () => ({ signature: new Uint8Array([7, 8, 9]) }))
   const unsubscribeSpy = vi.fn()
 
   let platform: PlatformInfo = DEFAULT_PLATFORM
@@ -96,6 +100,8 @@ function makeMockManager(wallets: WalletListEntry[] = [PHANTOM, SOLFLARE]): Mock
     disconnect: disconnectSpy,
     signMessage: signMessageSpy,
     signIn: signInSpy,
+    signTransaction: signTransactionSpy,
+    signAndSendTransaction: signAndSendTransactionSpy,
     getState: () => machine.getState(),
     getContext: () => machine.getContext(),
     getSortedWallets: () => wallets,
@@ -120,6 +126,8 @@ function makeMockManager(wallets: WalletListEntry[] = [PHANTOM, SOLFLARE]): Mock
     disconnectSpy,
     signMessageSpy,
     signInSpy,
+    signTransactionSpy,
+    signAndSendTransactionSpy,
     unsubscribeSpy,
     setPlatform: (next) => {
       platform = next
@@ -342,6 +350,20 @@ describe('useWallet (Vue composable)', () => {
 
     await wallet.signIn({ domain: 'example.com' })
     expect(mock.signInSpy).toHaveBeenCalledWith({ domain: 'example.com' })
+  })
+
+  it('signTransaction and signAndSendTransaction delegate to the manager', async () => {
+    const mock = makeMockManager()
+    const { wallet } = mountWithManager(mock.manager)
+    const tx = new Uint8Array([1, 1, 1])
+
+    const signed = await wallet.signTransaction(tx, 'solana:devnet')
+    expect(mock.signTransactionSpy).toHaveBeenCalledWith(tx, 'solana:devnet')
+    expect(signed).toEqual(new Uint8Array([4, 5, 6]))
+
+    const out = await wallet.signAndSendTransaction(tx, { chain: 'solana:devnet' })
+    expect(mock.signAndSendTransactionSpy).toHaveBeenCalledWith(tx, { chain: 'solana:devnet' })
+    expect(out).toEqual({ signature: new Uint8Array([7, 8, 9]) })
   })
 
   it('exposes platform from the manager', () => {

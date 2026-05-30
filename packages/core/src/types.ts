@@ -106,4 +106,9 @@ export type { WalletName } from './wallet-name'
 // and avoids requiring them to add `@solana/wallet-standard-features` as a
 // direct dependency.
 
-export type { SolanaSignInInput, SolanaSignInOutput } from '@solana/wallet-standard-features'
+export type {
+  SolanaSignInInput,
+  SolanaSignInOutput,
+  SolanaSignAndSendTransactionOptions,
+} from '@solana/wallet-standard-features'
+export type { IdentifierString } from '@wallet-standard/base'

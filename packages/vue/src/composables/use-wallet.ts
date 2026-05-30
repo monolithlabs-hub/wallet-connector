@@ -2,7 +2,9 @@ import {
   WalletConnectionError,
   type FlowContext,
   type FlowState,
+  type IdentifierString,
   type PlatformInfo,
+  type SolanaSignAndSendTransactionOptions,
   type SolanaSignInInput,
   type SolanaSignInOutput,
   type WalletListEntry,
@@ -72,6 +74,22 @@ export interface UseWalletReturn {
   disconnect: () => Promise<void>
   signMessage: (message: Uint8Array) => Promise<Uint8Array>
   signIn: (input?: SolanaSignInInput) => Promise<SolanaSignInOutput>
+  /**
+   * Sign a serialized transaction (raw bytes) with the connected wallet,
+   * returning the signed, serialized transaction. Extension path only —
+   * throws `WalletNotReadyError` on mobile deep-link. The chain defaults to
+   * the configured cluster.
+   */
+  signTransaction: (transaction: Uint8Array, chain?: IdentifierString) => Promise<Uint8Array>
+  /**
+   * Sign and broadcast a serialized transaction (raw bytes), returning the
+   * transaction signature bytes. Same platform constraints as
+   * {@link UseWalletReturn.signTransaction}.
+   */
+  signAndSendTransaction: (
+    transaction: Uint8Array,
+    options?: { chain?: IdentifierString } & SolanaSignAndSendTransactionOptions,
+  ) => Promise<{ signature: Uint8Array }>
 }
 
 /**
@@ -187,6 +205,14 @@ export function useWallet(): UseWalletReturn {
 
   const signMessage = (message: Uint8Array): Promise<Uint8Array> => manager.signMessage(message)
   const signIn = (input?: SolanaSignInInput): Promise<SolanaSignInOutput> => manager.signIn(input)
+  const signTransaction = (
+    transaction: Uint8Array,
+    chain?: IdentifierString,
+  ): Promise<Uint8Array> => manager.signTransaction(transaction, chain)
+  const signAndSendTransaction = (
+    transaction: Uint8Array,
+    options?: { chain?: IdentifierString } & SolanaSignAndSendTransactionOptions,
+  ): Promise<{ signature: Uint8Array }> => manager.signAndSendTransaction(transaction, options)
 
   return {
     state,
@@ -208,5 +234,7 @@ export function useWallet(): UseWalletReturn {
     disconnect,
     signMessage,
     signIn,
+    signTransaction,
+    signAndSendTransaction,
   }
 }

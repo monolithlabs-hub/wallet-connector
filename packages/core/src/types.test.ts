@@ -22,6 +22,7 @@ import type {
   EphemeralKeypair,
   FlowContext,
   FlowEvent,
+  IdentifierString,
   FlowMachine,
   FlowState,
   PendingState,
@@ -30,6 +31,7 @@ import type {
   SerializedFlow,
   SignConnectOptions,
   SolanaCluster,
+  SolanaSignAndSendTransactionOptions,
   SolanaSignInInput,
   SolanaSignInOutput,
   SortOptions,
@@ -67,12 +69,14 @@ type _Slots = {
   flowEvent: FlowEvent
   flowMachine: FlowMachine
   flowState: FlowState
+  identifierString: IdentifierString
   pendingState: PendingState
   platformInfo: PlatformInfo
   platformStrategy: PlatformStrategy
   serializedFlow: SerializedFlow
   signConnectOptions: SignConnectOptions
   solanaCluster: SolanaCluster
+  solanaSignAndSendTransactionOptions: SolanaSignAndSendTransactionOptions
   solanaSignInInput: SolanaSignInInput
   solanaSignInOutput: SolanaSignInOutput
   sortOptions: SortOptions
@@ -130,12 +134,14 @@ describe('public types barrel', () => {
       flowEvent: 'flowEvent',
       flowMachine: 'flowMachine',
       flowState: 'flowState',
+      identifierString: 'identifierString',
       pendingState: 'pendingState',
       platformInfo: 'platformInfo',
       platformStrategy: 'platformStrategy',
       serializedFlow: 'serializedFlow',
       signConnectOptions: 'signConnectOptions',
       solanaCluster: 'solanaCluster',
+      solanaSignAndSendTransactionOptions: 'solanaSignAndSendTransactionOptions',
       solanaSignInInput: 'solanaSignInInput',
       solanaSignInOutput: 'solanaSignInOutput',
       sortOptions: 'sortOptions',
@@ -152,7 +158,7 @@ describe('public types barrel', () => {
       walletManagerConfig: 'walletManagerConfig',
       walletName: 'walletName',
     }
-    expect(Object.keys(slots)).toHaveLength(37)
+    expect(Object.keys(slots)).toHaveLength(39)
   })
 
   it('PLAN.md TASK-110 lists 10 core types — verify each by name', () => {

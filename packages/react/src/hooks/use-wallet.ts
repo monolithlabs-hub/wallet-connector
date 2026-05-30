@@ -2,7 +2,9 @@ import {
   createWalletManager,
   WalletConnectionError,
   type FlowState,
+  type IdentifierString,
   type PlatformInfo,
+  type SolanaSignAndSendTransactionOptions,
   type SolanaSignInInput,
   type SolanaSignInOutput,
   type WalletError,
@@ -47,6 +49,22 @@ export interface UseWalletReturn {
   disconnect: () => Promise<void>
   signMessage: (message: Uint8Array) => Promise<Uint8Array>
   signIn: (input?: SolanaSignInInput) => Promise<SolanaSignInOutput>
+  /**
+   * Sign a serialized transaction (raw bytes) with the connected wallet,
+   * returning the signed, serialized transaction. Extension path only —
+   * throws `WalletNotReadyError` on mobile deep-link. The chain defaults to
+   * the provider's configured cluster.
+   */
+  signTransaction: (transaction: Uint8Array, chain?: IdentifierString) => Promise<Uint8Array>
+  /**
+   * Sign and broadcast a serialized transaction (raw bytes), returning the
+   * transaction signature bytes. Same platform constraints as
+   * {@link signTransaction}.
+   */
+  signAndSendTransaction: (
+    transaction: Uint8Array,
+    options?: { chain?: IdentifierString } & SolanaSignAndSendTransactionOptions,
+  ) => Promise<{ signature: Uint8Array }>
 
   // --- project-specific additions ----------------------------------------
   state: FlowState
@@ -233,6 +251,18 @@ export function useWallet(config?: WalletManagerConfig): UseWalletReturn {
 
   const signMessage = useCallback((message: Uint8Array) => manager.signMessage(message), [manager])
   const signIn = useCallback((input?: SolanaSignInInput) => manager.signIn(input), [manager])
+  const signTransaction = useCallback(
+    (transaction: Uint8Array, chain?: IdentifierString) =>
+      manager.signTransaction(transaction, chain),
+    [manager],
+  )
+  const signAndSendTransaction = useCallback(
+    (
+      transaction: Uint8Array,
+      options?: { chain?: IdentifierString } & SolanaSignAndSendTransactionOptions,
+    ) => manager.signAndSendTransaction(transaction, options),
+    [manager],
+  )
 
   const connected = state === 'connected' || state === 'signing' || state === 'authenticated'
 
@@ -247,6 +277,8 @@ export function useWallet(config?: WalletManagerConfig): UseWalletReturn {
     disconnect,
     signMessage,
     signIn,
+    signTransaction,
+    signAndSendTransaction,
     state,
     sortedWallets,
     platform,

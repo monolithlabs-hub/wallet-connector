@@ -244,8 +244,7 @@ const sectionBodyStyle: CSSProperties = {
       <h1 :style="titleStyle">wallet-connect example (Vue)</h1>
       <p :style="leadStyle">
         Live demos of <code>@monolithlabs-hub/wallet-connect-vue</code>. Pick a scenario from the
-        navigation, click <strong>Connect Wallet</strong>, and watch the flow state update
-        inline.
+        navigation, click <strong>Connect Wallet</strong>, and watch the flow state update inline.
       </p>
       <nav :style="navStyle" aria-label="Demos">
         <a

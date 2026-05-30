@@ -1,4 +1,9 @@
-import type { SolanaSignInInput, SolanaSignInOutput } from '@solana/wallet-standard-features'
+import type {
+  SolanaSignAndSendTransactionOptions,
+  SolanaSignInInput,
+  SolanaSignInOutput,
+} from '@solana/wallet-standard-features'
+import type { IdentifierString } from '@wallet-standard/base'
 import bs58 from 'bs58'
 
 import { createDeepLinkAdapter, type DeepLinkAdapter } from './adapters/deep-link-adapter'
@@ -143,6 +148,24 @@ export interface WalletManager {
    * if the wallet doesn't implement the `solana:signIn` feature.
    */
   signIn(input?: SolanaSignInInput): Promise<SolanaSignInOutput>
+  /**
+   * Sign a serialized transaction with the currently-connected wallet. Same
+   * platform constraints as {@link signMessage} — extension path only; throws
+   * `WalletNotReadyError` on the mobile deep-link path. The chain defaults to
+   * the configured {@link WalletManagerConfig.cluster}; pass `chain` to
+   * override. Returns the signed, serialized transaction bytes.
+   */
+  signTransaction(transaction: Uint8Array, chain?: IdentifierString): Promise<Uint8Array>
+  /**
+   * Sign and broadcast a serialized transaction with the currently-connected
+   * wallet. Same platform constraints as {@link signMessage}. The chain
+   * defaults to the configured {@link WalletManagerConfig.cluster}. Returns
+   * the transaction signature as raw bytes.
+   */
+  signAndSendTransaction(
+    transaction: Uint8Array,
+    options?: { chain?: IdentifierString } & SolanaSignAndSendTransactionOptions,
+  ): Promise<{ signature: Uint8Array }>
   getState(): FlowState
   getContext(): FlowContext
   /**
@@ -521,7 +544,7 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
   function requireConnectedStandardAdapter(): StandardWalletAdapter {
     if (platform.strategy !== 'extension') {
       throw new WalletNotReadyError(
-        'Standalone signMessage / signIn is not available on the mobile deep-link path; use `requireSignIn: true` on connect() instead',
+        'Standalone signMessage / signIn / signTransaction / signAndSendTransaction is not available on the mobile deep-link path; use `requireSignIn: true` on connect() instead',
       )
     }
     const ctx = machine.getContext()
@@ -553,6 +576,32 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
     assertAlive()
     const adapter = requireConnectedStandardAdapter()
     return adapter.signIn(input)
+  }
+
+  // Map the configured cluster to a Wallet-Standard chain id. Only
+  // 'devnet' and 'mainnet-beta' exist; anything that isn't devnet maps to
+  // mainnet — the wallet validates the actual endpoint it talks to regardless.
+  function configChain(): IdentifierString {
+    return (cluster === 'devnet' ? 'solana:devnet' : 'solana:mainnet') as IdentifierString
+  }
+
+  async function signTransaction(
+    transaction: Uint8Array,
+    chain?: IdentifierString,
+  ): Promise<Uint8Array> {
+    assertAlive()
+    const adapter = requireConnectedStandardAdapter()
+    return adapter.signTransaction(transaction, chain ?? configChain())
+  }
+
+  async function signAndSendTransaction(
+    transaction: Uint8Array,
+    options?: { chain?: IdentifierString } & SolanaSignAndSendTransactionOptions,
+  ): Promise<{ signature: Uint8Array }> {
+    assertAlive()
+    const adapter = requireConnectedStandardAdapter()
+    const { chain, ...sendOptions } = options ?? {}
+    return adapter.signAndSendTransaction(transaction, chain ?? configChain(), sendOptions)
   }
 
   async function disconnect(): Promise<void> {
@@ -606,6 +655,8 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
     disconnect,
     signMessage,
     signIn,
+    signTransaction,
+    signAndSendTransaction,
     getState: () => machine.getState(),
     getContext: () => machine.getContext(),
     getPlatform: () => getAugmentedPlatform(),

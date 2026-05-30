@@ -114,6 +114,8 @@ function makeMockManager(wallets: WalletListEntry[] = [PHANTOM, SOLFLARE]): Mock
     disconnect: disconnectSpy,
     signMessage: signMessageSpy,
     signIn: signInSpy,
+    signTransaction: vi.fn(async () => new Uint8Array()),
+    signAndSendTransaction: vi.fn(async () => ({ signature: new Uint8Array() })),
     getState: () => machine.getState(),
     getContext: () => machine.getContext(),
     getSortedWallets: () => wallets,

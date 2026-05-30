@@ -378,12 +378,7 @@ const connectedViewStyle: CSSProperties = {
   </button>
 
   <Teleport to="body">
-    <div
-      v-if="open"
-      role="presentation"
-      :style="modalBackdropStyle"
-      @click="handleBackdropClick"
-    >
+    <div v-if="open" role="presentation" :style="modalBackdropStyle" @click="handleBackdropClick">
       <div ref="dialog" v-bind="dialogAttrs" data-wc-modal :style="modalContentStyle">
         <header :style="modalHeaderStyle">
           <h2 :id="titleId" :style="modalTitleStyle">{{ modalTitle }}</h2>

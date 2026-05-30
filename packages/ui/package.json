@@ -1,6 +1,6 @@
 {
   "name": "@monolithlabs-hub/wallet-connect-ui",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Headless UI primitives for @monolithlabs-hub/wallet-connect: framework-agnostic modal lifecycle, focus trap, and wallet-list rendering helpers.",
   "keywords": [
     "solana",

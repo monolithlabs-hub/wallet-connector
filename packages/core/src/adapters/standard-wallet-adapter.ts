@@ -1,19 +1,28 @@
 // Portions ported from @solana/wallet-standard-wallet-adapter-base (Apache-2.0). See NOTICE.
 // Upstream: https://github.com/anza-xyz/wallet-adapter/blob/master/packages/wallet-standard/wallet-adapter-base/src/wallet.ts
 //
-// Scope deviation vs. upstream: this adapter intentionally omits
-// `sendTransaction` / `signTransaction` / `signAllTransactions` paths.
-// Consumers wanting transactions go through `@wallet-standard/app` directly.
+// Scope note: connect / signMessage / signIn are the primary surface. Solana
+// transaction signing (`signTransaction` / `signAndSendTransaction`) is also
+// supported on the extension path for wallets that expose the corresponding
+// Wallet-Standard features; wallets that don't throw `WalletNotReadyError` at
+// call time (transactions are not part of the discovery filter — see
+// `discovery.ts`). `signAllTransactions` is still omitted.
 
 import {
+  type SolanaSignAndSendTransactionFeature,
+  SolanaSignAndSendTransaction,
+  type SolanaSignAndSendTransactionOptions,
   type SolanaSignInFeature,
   type SolanaSignInInput,
   type SolanaSignInOutput,
   SolanaSignIn,
   type SolanaSignMessageFeature,
   SolanaSignMessage,
+  type SolanaSignTransactionFeature,
+  SolanaSignTransaction,
+  type SolanaSignTransactionOptions,
 } from '@solana/wallet-standard-features'
-import type { Wallet, WalletAccount } from '@wallet-standard/base'
+import type { IdentifierString, Wallet, WalletAccount } from '@wallet-standard/base'
 import {
   type StandardConnectFeature,
   StandardConnect,
@@ -28,8 +37,10 @@ import {
   WalletDisconnectionError,
   WalletNotConnectedError,
   WalletNotReadyError,
+  WalletSendTransactionError,
   WalletSignInError,
   WalletSignMessageError,
+  WalletSignTransactionError,
 } from '../errors'
 
 /**
@@ -58,6 +69,32 @@ export interface StandardWalletAdapter {
   disconnect(): Promise<void>
   signMessage(message: Uint8Array): Promise<Uint8Array>
   signIn(input?: SolanaSignInInput): Promise<SolanaSignInOutput>
+  /**
+   * Sign a serialized transaction with the connected account using the
+   * `solana:signTransaction` feature. `transaction` is raw transaction bytes;
+   * the returned value is the signed, serialized transaction (the wallet may
+   * have modified it — multisig / program wallets). `chain` is the
+   * Wallet-Standard chain id (e.g. `'solana:mainnet'`).
+   *
+   * Throws `WalletNotReadyError` if the wallet doesn't expose the feature,
+   * `WalletNotConnectedError` if no account is connected, and
+   * `WalletSignTransactionError` if the wallet rejects.
+   */
+  signTransaction(transaction: Uint8Array, chain?: IdentifierString): Promise<Uint8Array>
+  /**
+   * Sign and broadcast a serialized transaction via the
+   * `solana:signAndSendTransaction` feature. Returns the transaction
+   * signature as raw bytes. `chain` is required by the feature.
+   *
+   * Throws `WalletNotReadyError` if the wallet doesn't expose the feature,
+   * `WalletNotConnectedError` if no account is connected, and
+   * `WalletSendTransactionError` if the wallet rejects.
+   */
+  signAndSendTransaction(
+    transaction: Uint8Array,
+    chain: IdentifierString,
+    options?: SolanaSignAndSendTransactionOptions,
+  ): Promise<{ signature: Uint8Array }>
   /**
    * Observe state changes. Listeners fire on transitions only — they do
    * NOT receive the current state on subscribe. If the adapter is
@@ -259,6 +296,75 @@ export function createStandardWalletAdapter(wallet: Wallet): StandardWalletAdapt
     return output
   }
 
+  async function signTransaction(
+    transaction: Uint8Array,
+    chain?: IdentifierString,
+  ): Promise<Uint8Array> {
+    assertAlive()
+    if (!account) throw new WalletNotConnectedError(`Wallet "${wallet.name}" is not connected`)
+    const feature =
+      requireFeature<SolanaSignTransactionFeature[typeof SolanaSignTransaction]>(
+        SolanaSignTransaction,
+      )
+
+    let outputs: readonly { readonly signedTransaction: Uint8Array }[]
+    try {
+      // `SolanaSignTransactionOptions` (preflightCommitment / minContextSlot)
+      // are not surfaced through the WalletManager API — signing alone doesn't
+      // hit the network, so they're inert here. Callers that need them go
+      // through the wallet's feature directly via `.wallet`.
+      const options: SolanaSignTransactionOptions = {}
+      outputs = await feature.signTransaction({
+        account,
+        transaction,
+        ...(chain && { chain }),
+        options,
+      })
+    } catch (err) {
+      throw new WalletSignTransactionError(
+        err instanceof Error ? err.message : `Wallet "${wallet.name}" rejected the transaction`,
+        err,
+      )
+    }
+    const output = outputs[0]
+    if (!output) {
+      throw new WalletSignTransactionError(`Wallet "${wallet.name}" returned no signed transaction`)
+    }
+    return output.signedTransaction
+  }
+
+  async function signAndSendTransaction(
+    transaction: Uint8Array,
+    chain: IdentifierString,
+    options?: SolanaSignAndSendTransactionOptions,
+  ): Promise<{ signature: Uint8Array }> {
+    assertAlive()
+    if (!account) throw new WalletNotConnectedError(`Wallet "${wallet.name}" is not connected`)
+    const feature = requireFeature<
+      SolanaSignAndSendTransactionFeature[typeof SolanaSignAndSendTransaction]
+    >(SolanaSignAndSendTransaction)
+
+    let outputs: readonly { readonly signature: Uint8Array }[]
+    try {
+      outputs = await feature.signAndSendTransaction({
+        account,
+        transaction,
+        chain,
+        ...(options && { options }),
+      })
+    } catch (err) {
+      throw new WalletSendTransactionError(
+        err instanceof Error ? err.message : `Wallet "${wallet.name}" rejected the transaction`,
+        err,
+      )
+    }
+    const output = outputs[0]
+    if (!output) {
+      throw new WalletSendTransactionError(`Wallet "${wallet.name}" returned no signature`)
+    }
+    return { signature: output.signature }
+  }
+
   return {
     get wallet() {
       return wallet
@@ -273,6 +379,8 @@ export function createStandardWalletAdapter(wallet: Wallet): StandardWalletAdapt
     disconnect,
     signMessage,
     signIn,
+    signTransaction,
+    signAndSendTransaction,
     subscribe(listener) {
       assertAlive()
       listeners.add(listener)

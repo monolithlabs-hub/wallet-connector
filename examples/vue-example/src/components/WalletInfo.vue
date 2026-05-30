@@ -45,7 +45,9 @@ const listStyle: CSSProperties = {
 <template>
   <dl v-if="state !== 'idle'" :style="listStyle">
     <dt :style="dtStyle">state</dt>
-    <dd :style="ddStyle"><code>{{ state }}</code></dd>
+    <dd :style="ddStyle">
+      <code>{{ state }}</code>
+    </dd>
 
     <template v-if="wallet">
       <dt :style="dtStyle">wallet</dt>

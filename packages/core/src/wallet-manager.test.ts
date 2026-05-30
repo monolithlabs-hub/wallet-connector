@@ -115,6 +115,8 @@ function makeStandardAdapter(opts: {
   signature?: Uint8Array
   connectThrows?: unknown
   signMessageThrows?: unknown
+  signedTransaction?: Uint8Array
+  txSignature?: Uint8Array
 }): StandardWalletAdapter {
   const fakeWallet = { name: opts.name } as unknown as StandardWalletAdapter['wallet']
   return {
@@ -131,6 +133,10 @@ function makeStandardAdapter(opts: {
       return opts.signature ?? new Uint8Array(64).fill(0xab)
     }),
     signIn: vi.fn(),
+    signTransaction: vi.fn(async () => opts.signedTransaction ?? new Uint8Array([9, 9, 9])),
+    signAndSendTransaction: vi.fn(async () => ({
+      signature: opts.txSignature ?? new Uint8Array([7, 7, 7]),
+    })),
     subscribe: vi.fn(() => () => {}),
     destroy: vi.fn(),
   } as unknown as StandardWalletAdapter
@@ -1262,5 +1268,123 @@ describe('createWalletManager — signMessage / signIn (mobile)', () => {
   it('signIn throws WalletNotReadyError — bundled SIWS only on the deep-link path', async () => {
     const manager = createWalletManager({ wallets: [PHANTOM] })
     await expect(manager.signIn()).rejects.toThrow(WalletNotReadyError)
+  })
+})
+
+describe('createWalletManager — signTransaction / signAndSendTransaction (desktop)', () => {
+  beforeEach(() => {
+    mocks.detectPlatform.mockReturnValue(DESKTOP_PLATFORM)
+  })
+
+  it('signTransaction delegates to the connected adapter with the default mainnet chain', async () => {
+    const signed = new Uint8Array([1, 2, 3])
+    const adapter = makeStandardAdapter({
+      name: 'Phantom',
+      connectPublicKey: 'PK',
+      signedTransaction: signed,
+    })
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([adapter]))
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+
+    await manager.connect('phantom')
+    const tx = new Uint8Array([0xaa])
+    const out = await manager.signTransaction(tx)
+
+    expect(adapter.signTransaction).toHaveBeenCalledWith(tx, 'solana:mainnet')
+    expect(out).toEqual(signed)
+  })
+
+  it('signTransaction maps the devnet cluster to solana:devnet by default', async () => {
+    const adapter = makeStandardAdapter({ name: 'Phantom', connectPublicKey: 'PK' })
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([adapter]))
+    const manager = createWalletManager({ wallets: [PHANTOM], cluster: 'devnet' })
+
+    await manager.connect('phantom')
+    await manager.signTransaction(new Uint8Array([0xbb]))
+
+    expect(adapter.signTransaction).toHaveBeenCalledWith(expect.any(Uint8Array), 'solana:devnet')
+  })
+
+  it('signTransaction honors an explicit chain override', async () => {
+    const adapter = makeStandardAdapter({ name: 'Phantom', connectPublicKey: 'PK' })
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([adapter]))
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+
+    await manager.connect('phantom')
+    await manager.signTransaction(new Uint8Array([0xcc]), 'solana:testnet')
+
+    expect(adapter.signTransaction).toHaveBeenCalledWith(expect.any(Uint8Array), 'solana:testnet')
+  })
+
+  it('signAndSendTransaction delegates and returns the signature (default mainnet chain)', async () => {
+    const sig = new Uint8Array([5, 5, 5])
+    const adapter = makeStandardAdapter({
+      name: 'Phantom',
+      connectPublicKey: 'PK',
+      txSignature: sig,
+    })
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([adapter]))
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+
+    await manager.connect('phantom')
+    const tx = new Uint8Array([0xdd])
+    const out = await manager.signAndSendTransaction(tx)
+
+    expect(adapter.signAndSendTransaction).toHaveBeenCalledWith(tx, 'solana:mainnet', {})
+    expect(out).toEqual({ signature: sig })
+  })
+
+  it('signAndSendTransaction maps devnet and forwards send options minus chain', async () => {
+    const adapter = makeStandardAdapter({ name: 'Phantom', connectPublicKey: 'PK' })
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([adapter]))
+    const manager = createWalletManager({ wallets: [PHANTOM], cluster: 'devnet' })
+
+    await manager.connect('phantom')
+    await manager.signAndSendTransaction(new Uint8Array([0xee]), {
+      chain: 'solana:devnet',
+      skipPreflight: true,
+    })
+
+    expect(adapter.signAndSendTransaction).toHaveBeenCalledWith(
+      expect.any(Uint8Array),
+      'solana:devnet',
+      { skipPreflight: true },
+    )
+  })
+
+  it('signTransaction throws WalletNotConnectedError when no wallet is connected', async () => {
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([]))
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+
+    await expect(manager.signTransaction(new Uint8Array([0]))).rejects.toThrow(
+      WalletNotConnectedError,
+    )
+  })
+
+  it('signTransaction throws after destroy()', async () => {
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([]))
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+    manager.destroy()
+
+    await expect(manager.signTransaction(new Uint8Array([0]))).rejects.toThrow(/has been destroyed/)
+  })
+})
+
+describe('createWalletManager — signTransaction / signAndSendTransaction (mobile)', () => {
+  beforeEach(() => {
+    mocks.detectPlatform.mockReturnValue(MOBILE_PLATFORM)
+    mocks.createDeepLinkAdapter.mockReturnValue(makeDeepLinkAdapter())
+  })
+
+  it('signTransaction throws WalletNotReadyError on the deep-link path', async () => {
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+    await expect(manager.signTransaction(new Uint8Array([0]))).rejects.toThrow(WalletNotReadyError)
+  })
+
+  it('signAndSendTransaction throws WalletNotReadyError on the deep-link path', async () => {
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+    await expect(manager.signAndSendTransaction(new Uint8Array([0]))).rejects.toThrow(
+      WalletNotReadyError,
+    )
   })
 })

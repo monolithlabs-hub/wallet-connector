@@ -1,8 +1,10 @@
 import {
+  SolanaSignAndSendTransaction,
   SolanaSignIn,
   type SolanaSignInInput,
   type SolanaSignInOutput,
   SolanaSignMessage,
+  SolanaSignTransaction,
 } from '@solana/wallet-standard-features'
 import type { Wallet, WalletAccount } from '@wallet-standard/base'
 import {
@@ -18,8 +20,10 @@ import {
   WalletDisconnectionError,
   WalletNotConnectedError,
   WalletNotReadyError,
+  WalletSendTransactionError,
   WalletSignInError,
   WalletSignMessageError,
+  WalletSignTransactionError,
 } from '../errors'
 
 import { createStandardWalletAdapter } from './standard-wallet-adapter'
@@ -42,6 +46,8 @@ interface FakeWalletControls {
   connectSpy: ReturnType<typeof vi.fn>
   signMessageSpy: ReturnType<typeof vi.fn>
   signInSpy: ReturnType<typeof vi.fn>
+  signTransactionSpy: ReturnType<typeof vi.fn>
+  signAndSendTransactionSpy: ReturnType<typeof vi.fn>
   disconnectSpy: ReturnType<typeof vi.fn>
 }
 
@@ -53,10 +59,14 @@ function makeFakeWallet(
     withDisconnect?: boolean
     withSignMessage?: boolean
     withSignIn?: boolean
+    withSignTransaction?: boolean
+    withSignAndSendTransaction?: boolean
     withEvents?: boolean
     connectImpl?: () => Promise<{ accounts: readonly WalletAccount[] }>
     signMessageImpl?: () => Promise<readonly { signature: Uint8Array }[]>
     signInImpl?: (input?: SolanaSignInInput) => Promise<readonly SolanaSignInOutput[]>
+    signTransactionImpl?: () => Promise<readonly { signedTransaction: Uint8Array }[]>
+    signAndSendTransactionImpl?: () => Promise<readonly { signature: Uint8Array }[]>
     disconnectImpl?: () => Promise<void>
   } = {},
 ): FakeWalletControls {
@@ -67,6 +77,8 @@ function makeFakeWallet(
     withDisconnect = true,
     withSignMessage = true,
     withSignIn = false,
+    withSignTransaction = false,
+    withSignAndSendTransaction = false,
     withEvents = true,
   } = options
 
@@ -93,6 +105,14 @@ function makeFakeWallet(
           } as SolanaSignInOutput,
         ]
       }),
+  )
+  const signTransactionSpy = vi.fn(
+    options.signTransactionImpl ??
+      (async () => [{ signedTransaction: new Uint8Array(8).fill(0x33) }]),
+  )
+  const signAndSendTransactionSpy = vi.fn(
+    options.signAndSendTransactionImpl ??
+      (async () => [{ signature: new Uint8Array(64).fill(0x44) }]),
   )
   const disconnectSpy = vi.fn(options.disconnectImpl ?? (async () => undefined))
 
@@ -124,6 +144,20 @@ function makeFakeWallet(
   if (withSignIn) {
     features[SolanaSignIn] = { version: '1.0.0', signIn: signInSpy }
   }
+  if (withSignTransaction) {
+    features[SolanaSignTransaction] = {
+      version: '1.0.0',
+      supportedTransactionVersions: ['legacy', 0],
+      signTransaction: signTransactionSpy,
+    }
+  }
+  if (withSignAndSendTransaction) {
+    features[SolanaSignAndSendTransaction] = {
+      version: '1.0.0',
+      supportedTransactionVersions: ['legacy', 0],
+      signAndSendTransaction: signAndSendTransactionSpy,
+    }
+  }
 
   const wallet: Wallet = {
     version: '1.0.0',
@@ -139,6 +173,8 @@ function makeFakeWallet(
     connectSpy,
     signMessageSpy,
     signInSpy,
+    signTransactionSpy,
+    signAndSendTransactionSpy,
     disconnectSpy,
     emitChange(props) {
       for (const listener of [...changeListeners]) listener(props)
@@ -268,6 +304,111 @@ describe('StandardWalletAdapter.signIn', () => {
     const adapter = createStandardWalletAdapter(wallet)
 
     await expect(adapter.signIn()).rejects.toThrow(WalletSignInError)
+  })
+})
+
+describe('StandardWalletAdapter.signTransaction', () => {
+  it('returns the signed transaction bytes from the first output', async () => {
+    const { wallet, signTransactionSpy } = makeFakeWallet({
+      initialAccounts: [makeAccount(PUBKEY_A)],
+      withSignTransaction: true,
+    })
+    const adapter = createStandardWalletAdapter(wallet)
+    await adapter.connect()
+
+    const signed = await adapter.signTransaction(new Uint8Array([9, 9]), 'solana:devnet')
+
+    expect(signed).toEqual(new Uint8Array(8).fill(0x33))
+    expect(signTransactionSpy).toHaveBeenCalledOnce()
+    expect(signTransactionSpy.mock.calls[0]?.[0]).toMatchObject({ chain: 'solana:devnet' })
+  })
+
+  it('rejects with WalletNotConnectedError when no account is selected', async () => {
+    const { wallet } = makeFakeWallet({ withSignTransaction: true })
+    const adapter = createStandardWalletAdapter(wallet)
+
+    await expect(adapter.signTransaction(new Uint8Array([1]))).rejects.toThrow(
+      WalletNotConnectedError,
+    )
+  })
+
+  it('rejects with WalletNotReadyError when solana:signTransaction is missing', async () => {
+    const { wallet } = makeFakeWallet({ initialAccounts: [makeAccount(PUBKEY_A)] })
+    const adapter = createStandardWalletAdapter(wallet)
+    await adapter.connect()
+
+    await expect(adapter.signTransaction(new Uint8Array([1]))).rejects.toThrow(WalletNotReadyError)
+  })
+
+  it('rejects with WalletSignTransactionError on user cancel', async () => {
+    const { wallet } = makeFakeWallet({
+      initialAccounts: [makeAccount(PUBKEY_A)],
+      withSignTransaction: true,
+      signTransactionImpl: async () => {
+        throw new Error('user rejected')
+      },
+    })
+    const adapter = createStandardWalletAdapter(wallet)
+    await adapter.connect()
+
+    await expect(adapter.signTransaction(new Uint8Array([1]))).rejects.toThrow(
+      WalletSignTransactionError,
+    )
+  })
+})
+
+describe('StandardWalletAdapter.signAndSendTransaction', () => {
+  it('returns the signature bytes from the first output', async () => {
+    const { wallet, signAndSendTransactionSpy } = makeFakeWallet({
+      initialAccounts: [makeAccount(PUBKEY_A)],
+      withSignAndSendTransaction: true,
+    })
+    const adapter = createStandardWalletAdapter(wallet)
+    await adapter.connect()
+
+    const { signature } = await adapter.signAndSendTransaction(
+      new Uint8Array([9, 9]),
+      'solana:devnet',
+    )
+
+    expect(signature).toEqual(new Uint8Array(64).fill(0x44))
+    expect(signAndSendTransactionSpy).toHaveBeenCalledOnce()
+    expect(signAndSendTransactionSpy.mock.calls[0]?.[0]).toMatchObject({ chain: 'solana:devnet' })
+  })
+
+  it('rejects with WalletNotConnectedError when no account is selected', async () => {
+    const { wallet } = makeFakeWallet({ withSignAndSendTransaction: true })
+    const adapter = createStandardWalletAdapter(wallet)
+
+    await expect(
+      adapter.signAndSendTransaction(new Uint8Array([1]), 'solana:devnet'),
+    ).rejects.toThrow(WalletNotConnectedError)
+  })
+
+  it('rejects with WalletNotReadyError when the feature is missing', async () => {
+    const { wallet } = makeFakeWallet({ initialAccounts: [makeAccount(PUBKEY_A)] })
+    const adapter = createStandardWalletAdapter(wallet)
+    await adapter.connect()
+
+    await expect(
+      adapter.signAndSendTransaction(new Uint8Array([1]), 'solana:devnet'),
+    ).rejects.toThrow(WalletNotReadyError)
+  })
+
+  it('rejects with WalletSendTransactionError on user cancel', async () => {
+    const { wallet } = makeFakeWallet({
+      initialAccounts: [makeAccount(PUBKEY_A)],
+      withSignAndSendTransaction: true,
+      signAndSendTransactionImpl: async () => {
+        throw new Error('user rejected')
+      },
+    })
+    const adapter = createStandardWalletAdapter(wallet)
+    await adapter.connect()
+
+    await expect(
+      adapter.signAndSendTransaction(new Uint8Array([1]), 'solana:devnet'),
+    ).rejects.toThrow(WalletSendTransactionError)
   })
 })
 

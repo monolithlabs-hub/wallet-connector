@@ -1,7 +1,7 @@
 {
   "name": "wallet-connector",
-  "version": "1.0.1",
-  "private": true,
+  "version": "1.0.2",
+  "private": false,
   "description": "Solana wallet-connect monorepo (@monolithlabs-hub/wallet-connect)",
   "packageManager": "pnpm@11.0.8",
   "engines": {
