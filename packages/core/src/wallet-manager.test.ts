@@ -511,6 +511,79 @@ describe('createWalletManager — wallet ordering', () => {
   })
 })
 
+describe('createWalletManager — discovered-only pin target', () => {
+  // The real Opindex extension registers via Wallet Standard only (name
+  // 'Opindex', no `window.*` global) and is NOT listed in the consumer's
+  // `wallets[]`. It must still pin to index 0 on desktop when detected.
+  beforeEach(() => {
+    mocks.detectPlatform.mockReturnValue(DESKTOP_PLATFORM)
+  })
+
+  it('pins a discovered-only Opindex on desktop (not in config.wallets)', () => {
+    const opindexAdapter = makeStandardAdapter({ name: 'Opindex' })
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([opindexAdapter]))
+    const manager = createWalletManager({ wallets: [PHANTOM, SOLFLARE] })
+
+    const sorted = manager.getSortedWallets()
+
+    expect(sorted[0]?.id).toBe('opindex')
+    expect(sorted[0]?.source).toBe('discovered')
+    expect(sorted[0]?.isDetected).toBe(true)
+    expect(manager.getPlatform().hasOpindexExtension).toBe(true)
+  })
+
+  it('pins a discovered-only Opindex ahead of other discovered wallets', () => {
+    const opindexAdapter = makeStandardAdapter({ name: 'Opindex' })
+    const backpackAdapter = makeStandardAdapter({ name: 'Backpack' })
+    mocks.discoverStandardWallets.mockReturnValue(
+      makeDiscoveryHandle([backpackAdapter, opindexAdapter]),
+    )
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+
+    const sorted = manager.getSortedWallets()
+
+    expect(sorted[0]?.id).toBe('opindex')
+    expect(sorted.map((w) => w.id)).toContain('backpack')
+    expect(sorted.findIndex((w) => w.id === 'opindex')).toBeLessThan(
+      sorted.findIndex((w) => w.id === 'backpack'),
+    )
+  })
+
+  it('does NOT pin when the pin target is neither configured nor discovered', () => {
+    // Regression guard for the new discovered-only (`else`) branch: no
+    // adapter slug equals 'opindex', so hasOpindexExtension must stay false.
+    const phantomAdapter = makeStandardAdapter({ name: 'Phantom' })
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([phantomAdapter]))
+    const manager = createWalletManager({ wallets: [PHANTOM, SOLFLARE] })
+
+    expect(manager.getPlatform().hasOpindexExtension).toBe(false)
+    expect(manager.getSortedWallets()[0]?.id).not.toBe('opindex')
+  })
+
+  it('pinnedWallet: null does not pin a discovered-only Opindex', () => {
+    const opindexAdapter = makeStandardAdapter({ name: 'Opindex' })
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([opindexAdapter]))
+    const manager = createWalletManager({ wallets: [PHANTOM, SOLFLARE], pinnedWallet: null })
+
+    expect(manager.getPlatform().hasOpindexExtension).toBe(false)
+    expect(manager.getSortedWallets()[0]?.id).not.toBe('opindex')
+  })
+
+  it('re-evaluates and pins a discovered-only Opindex registering late', () => {
+    const handle = makeControllableDiscoveryHandle([])
+    mocks.discoverStandardWallets.mockReturnValue(handle)
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+
+    expect(manager.getSortedWallets()[0]?.id).not.toBe('opindex')
+    expect(manager.getPlatform().hasOpindexExtension).toBe(false)
+
+    handle.triggerChange([makeStandardAdapter({ name: 'Opindex' })])
+
+    expect(manager.getSortedWallets()[0]?.id).toBe('opindex')
+    expect(manager.getPlatform().hasOpindexExtension).toBe(true)
+  })
+})
+
 describe('createWalletManager — registry-driven reactivity', () => {
   beforeEach(() => {
     mocks.detectPlatform.mockReturnValue(DESKTOP_PLATFORM)
