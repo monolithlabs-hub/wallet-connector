@@ -282,13 +282,17 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
     if (augmentedPlatformCache) return augmentedPlatformCache
     let hasOpindexExtension = platform.hasOpindexExtension
     if (!hasOpindexExtension && pinnedWallet && discoveryHandle) {
+      const adapters = discoveryHandle.getAdapters()
       const pinnedConfig = config.wallets.find((w) => w.id === pinnedWallet)
-      if (pinnedConfig) {
-        const adapters = discoveryHandle.getAdapters()
-        if (adapters.some((a) => walletConfigMatchesName(pinnedConfig, a.wallet.name))) {
-          hasOpindexExtension = true
-        }
-      }
+      const matched = pinnedConfig
+        ? // Configured pin target: match by standardName / case-insensitive name.
+          adapters.some((a) => walletConfigMatchesName(pinnedConfig, a.wallet.name))
+        : // Discovered-only pin target (not in `config.wallets`): the merged
+          // entry's id is the wallet's name slug, so a registered wallet whose
+          // slug === pinnedWallet IS the pin target. Lets a Wallet-Standard-only
+          // Opindex (no `window.*` global) pin to index 0 on desktop.
+          adapters.some((a) => walletNameSlug(a.wallet.name) === pinnedWallet)
+      if (matched) hasOpindexExtension = true
     }
     augmentedPlatformCache = { ...platform, hasOpindexExtension }
     return augmentedPlatformCache

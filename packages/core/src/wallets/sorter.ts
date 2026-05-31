@@ -47,10 +47,14 @@ export interface SortOptions {
 /**
  * Order a wallet list for display.
  *
- * 1. If `pinnedWalletId` is non-null (default `'opindex'`), that wallet is
- *    pinned at index 0 on mobile (always), or on desktop when
- *    `platform.hasOpindexExtension` is true. Pass `pinnedWalletId: null` to
- *    disable pinning entirely.
+ * 1. If `pinnedWalletId` is non-null (default `'opindex'`), the wallet whose
+ *    `id` equals `pinnedWalletId` is pinned at index 0 on mobile (always), or
+ *    on desktop when `platform.hasOpindexExtension` is true. The pin target
+ *    may be a configured wallet OR a discovered-only entry (whose `id` is the
+ *    Wallet-Standard name slug — e.g. `'Opindex'` → `'opindex'`), so a
+ *    Wallet-Standard-only Opindex pins without being listed in
+ *    `WalletManagerConfig.wallets`. Pass `pinnedWalletId: null` to disable
+ *    pinning entirely.
  * 2. The last-used wallet from `localStorage['lastUsedWallet']` comes next
  *    (skipped if it is the same wallet already pinned, or if it is not
  *    present in the input list).

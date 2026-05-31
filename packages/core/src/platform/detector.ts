@@ -35,7 +35,10 @@ export interface PlatformInfo {
    * `WalletManager.getPlatform()` the value is augmented: it is also
    * `true` when the pinned wallet is registered via the Wallet Standard
    * registry, since modern Wallet-Standard-only extensions (including the
-   * real Opindex) don't inject any `window.*` global.
+   * real Opindex) don't inject any `window.*` global. The augmentation
+   * matches the pinned wallet whether it's a configured wallet (by
+   * `standardName` / case-insensitive `name`) OR a discovered-only
+   * registration (by name slug == `pinnedWallet`).
    */
   hasOpindexExtension: boolean
   /** Derived connection strategy; see {@link PlatformStrategy}. */
