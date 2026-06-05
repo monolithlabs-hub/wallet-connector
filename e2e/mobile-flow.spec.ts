@@ -23,6 +23,7 @@ import { expect, test } from '@playwright/test'
  */
 const THIRD_PARTY_HOSTS = new Set([
   'opindex.app',
+  'opindex.deeptap.io',
   'phantom.app',
   'solflare.com',
   'apps.apple.com',
@@ -69,25 +70,21 @@ test.describe('Mobile flow', () => {
     await expect(opindex).toContainText(expectedLabel)
   })
 
-  test('tapping Opindex attempts the deep link, then redirects to the store after 1500ms', async ({
+  test('tapping Opindex routes to the install/landing page (install/open-only wallet)', async ({
     page,
   }) => {
     const capturedNavigations: string[] = []
 
     // Intercept all third-party origin requests so Playwright doesn't
-    // actually navigate away to opindex.app / apps.apple.com / etc.
-    // Each captured URL ends up in `capturedNavigations` for later
-    // assertion.
+    // actually navigate away to opindex.deeptap.io. Each captured URL
+    // ends up in `capturedNavigations` for later assertion.
     await page.route('**/*', async (route) => {
       const url = route.request().url()
       if (isThirdPartyNavigation(url)) {
         capturedNavigations.push(url)
         // `route.fulfill({status: 204})` over `route.abort()`: Chromium
-        // navigates to a `chrome-error://` page on `abort()`,
-        // destroying the React context before the 1500ms fallback can
-        // fire. A 204 No Content response leaves the page state intact
-        // on all browsers — Chromium, WebKit, and Firefox — and the
-        // captured URL is enough for the assertion.
+        // navigates to a `chrome-error://` page on `abort()`. A 204 No
+        // Content response leaves the page state intact on all browsers.
         await route.fulfill({ status: 204, body: '' })
       } else {
         await route.continue()
@@ -101,23 +98,50 @@ test.describe('Mobile flow', () => {
     await expect(opindex).toBeVisible()
     await opindex.click()
 
-    // First navigation: the wallet's universal-link URL. Fires
-    // synchronously when the adapter calls `navigate(deepLinkUrl)`.
+    // Opindex has no external deep-link connect protocol — it only
+    // connects inside its own in-app browser. Selecting it on a mobile
+    // browser navigates straight to the download/landing page, with NO
+    // universal-link probe and NO store fallback.
     await expect.poll(() => capturedNavigations.length).toBeGreaterThanOrEqual(1)
-    expect(capturedNavigations[0]).toMatch(/^https:\/\/opindex\.app\/ul\/v1\/connect/)
+    expect(capturedNavigations[0]).toMatch(/^https:\/\/opindex\.deeptap\.io/)
 
-    // Second navigation: the platform store URL, scheduled 1500ms
-    // later by the DeepLinkAdapter's fallback. Wait a bit past 1500ms
-    // to allow for jitter under Playwright's test runner.
-    await expect
-      .poll(() => capturedNavigations.length, { timeout: 5_000 })
-      .toBeGreaterThanOrEqual(2)
+    // Give a (non-existent) fallback a chance to fire. After 2s of wall
+    // clock there should still be exactly one navigation.
+    await page.waitForTimeout(2_000)
+    expect(capturedNavigations).toHaveLength(1)
+  })
 
-    const userAgent = await page.evaluate(() => navigator.userAgent)
-    const expectedStoreHost = /iPhone|iPad|iPod/.test(userAgent)
-      ? 'apps.apple.com'
-      : 'play.google.com'
-    expect(capturedNavigations[1]).toContain(expectedStoreHost)
+  test('returning after an abandoned deep link re-enables the wallet list (issue 2)', async ({
+    page,
+  }) => {
+    // Keep the page alive when the deep-link adapter navigates to the
+    // wallet (204 instead of a real navigation).
+    await page.route('**/*', async (route) => {
+      if (isThirdPartyNavigation(route.request().url())) {
+        await route.fulfill({ status: 204, body: '' })
+      } else {
+        await route.continue()
+      }
+    })
+
+    await page.goto('/')
+    await page.getByRole('button', { name: /connect wallet/i }).click()
+
+    // Tap Solflare (a real deep-link wallet). It navigates away; the flow
+    // enters 'connecting', which disables every wallet row.
+    await page.locator('[data-wallet-id="solflare"]').first().click()
+
+    const opindexButton = page.locator('button[data-wallet-id="opindex"]').first()
+    await expect(opindexButton).toBeDisabled()
+
+    // User switches back to the browser WITHOUT completing the connection.
+    await page.evaluate(() => {
+      document.dispatchEvent(new Event('visibilitychange'))
+      window.dispatchEvent(new Event('pageshow'))
+    })
+
+    // The modal un-freezes: wallet rows are clickable again.
+    await expect(opindexButton).toBeEnabled()
   })
 
   test('App Store fallback does NOT fire if user picks Phantom (non-pinned wallet)', async ({

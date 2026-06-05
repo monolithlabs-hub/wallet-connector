@@ -26,7 +26,12 @@ import {
   type Unsubscribe,
 } from './state/machine'
 import { asWalletName } from './wallet-name'
-import { mergeWalletList, walletNameSlug, type WalletListEntry } from './wallets/list-entry'
+import {
+  mergeWalletList,
+  normalizeWalletName,
+  walletNameSlug,
+  type WalletListEntry,
+} from './wallets/list-entry'
 import { getSortedWallets, type WalletConfig } from './wallets/sorter'
 
 /**
@@ -274,6 +279,22 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
     deepLinkAdapter = createDeepLinkAdapterForConfig(config, platform, cluster)
   }
 
+  // On the mobile deep-link path, recover when the user returns to the page —
+  // either to finish a real callback or to un-freeze an abandoned connect.
+  let removeReturnListeners: (() => void) | null = null
+  if (deepLinkAdapter && typeof document !== 'undefined' && typeof window !== 'undefined') {
+    const onVisible = (): void => {
+      if (!document.hidden) recoverOrResume()
+    }
+    const onPageShow = (): void => recoverOrResume()
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('pageshow', onPageShow)
+    removeReturnListeners = (): void => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('pageshow', onPageShow)
+    }
+  }
+
   // Cache of the augmented platform. Invalidated on every registry
   // change; recomputed lazily when {@link getPlatform} or
   // {@link getSortedWallets} is called.
@@ -334,9 +355,10 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
       ? adapters.find((a) => a.wallet.name === walletConfig.standardName)
       : undefined
     if (byStandardName) return byStandardName
-    return (
-      adapters.find((a) => a.wallet.name.toLowerCase() === walletConfig.name.toLowerCase()) ?? null
-    )
+    // Normalized name match (tolerates the "X" vs "X Wallet" variance) so
+    // `connect()` resolves the same adapter the merged list deduped against.
+    const target = normalizeWalletName(walletConfig.name)
+    return adapters.find((a) => normalizeWalletName(a.wallet.name) === target) ?? null
   }
 
   function findWalletConfig(walletId: string): WalletConfig | null {
@@ -447,7 +469,17 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
       return
     }
 
-    // strategy === 'install-prompt'
+    // strategy === 'install-prompt' (desktop, no extension). Prefer the
+    // browser-extension install page (e.g. Chrome Web Store), falling back to
+    // the generic install/landing page. Open it in a new tab so the dapp stays
+    // put, then return the flow to idle (no error banner). Otherwise surface
+    // the informational "not ready" error.
+    const desktopInstallUrl = walletConfig.extensionUrl ?? walletConfig.installUrl
+    if (desktopInstallUrl && typeof window !== 'undefined') {
+      window.open(desktopInstallUrl, '_blank', 'noopener,noreferrer')
+      machine.send({ type: 'RESET' })
+      return
+    }
     throw reportError(
       new WalletNotReadyError(
         `No compatible wallet detected. Install ${walletConfig.name} or pick a different wallet.`,
@@ -498,6 +530,17 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
     if (!deepLinkAdapter) {
       throw reportError(new WalletNotReadyError('DeepLinkAdapter is unavailable on this platform'))
     }
+
+    // Install/open-only wallet (no `universalLink`, e.g. Opindex): there is no
+    // external mobile connect protocol. Send the user to the download/landing
+    // page and return the flow to idle — no handshake, no pending state, no
+    // never-resolving promise that could wedge the modal.
+    if (!walletConfig.universalLink) {
+      deepLinkAdapter.openInstall(walletConfig)
+      machine.send({ type: 'RESET' })
+      return
+    }
+
     // signInMessage is called with '' on mobile because publicKey is only
     // known on the post-redirect page. Documented in the JSDoc.
     const signInMessageStr =
@@ -515,22 +558,23 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
     }
   }
 
-  function initialize(): void {
-    // Lenient when destroyed — `initialize` is an observer-style entry point
-    // called from React effects under StrictMode, where the manager may have
-    // been destroyed by a previous cleanup pass. A dead manager has nothing
-    // to resume; silently no-op rather than throwing.
-    if (destroyed) return
-    if (!deepLinkAdapter) return
-    // Read pending state BEFORE calling resumeFromCallback (which clears
-    // it). We need the walletId + requireSignIn to drive the FlowMachine.
-    const pending = getPendingState()
-    if (!pending) return
-
-    const result = deepLinkAdapter.resumeFromCallback()
-    if (!result) return
-
-    machine.send({ type: 'CONNECT_INITIATED', walletId: pending.walletId })
+  /**
+   * Drive the FlowMachine + lifecycle callbacks from a parsed deep-link
+   * callback. Works from BOTH entry points:
+   * - fresh page load (`initialize`): machine is `'idle'`, so we open with
+   *   `CONNECT_INITIATED`;
+   * - same-context return (bfcache restore via `recoverOrResume`): the machine
+   *   is already `'connecting'` from the tap that started the flow, so we skip
+   *   straight to `WALLET_CONNECTED`. Any other lingering state is RESET first.
+   */
+  function applyResumedCallback(
+    pending: { walletId: string; requireSignIn: boolean },
+    result: { publicKey: string; signature?: string },
+  ): void {
+    if (machine.getState() !== 'connecting') {
+      if (machine.getState() !== 'idle') machine.send({ type: 'RESET' })
+      machine.send({ type: 'CONNECT_INITIATED', walletId: pending.walletId })
+    }
     machine.send({
       type: 'WALLET_CONNECTED',
       publicKey: result.publicKey,
@@ -542,6 +586,59 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
       machine.send({ type: 'SIGN_INITIATED' })
       machine.send({ type: 'SIGN_COMPLETED', signature: result.signature })
       safeCallback(config.onAuthenticated, result.publicKey, result.signature)
+    }
+  }
+
+  /** Returns true iff a pending callback was found, parsed, and applied. */
+  function tryResumeFromCallback(): boolean {
+    if (destroyed || !deepLinkAdapter) return false
+    // Read pending state BEFORE calling resumeFromCallback (which clears it).
+    const pending = getPendingState()
+    if (!pending) return false
+    const result = deepLinkAdapter.resumeFromCallback()
+    if (!result) return false
+    applyResumedCallback(pending, result)
+    return true
+  }
+
+  function initialize(): void {
+    // Lenient when destroyed — `initialize` is an observer-style entry point
+    // called from React effects under StrictMode, where the manager may have
+    // been destroyed by a previous cleanup pass. A dead manager has nothing
+    // to resume; silently no-op rather than throwing.
+    if (tryResumeFromCallback()) {
+      inflightConnect = null
+      inflightWalletId = null
+    }
+  }
+
+  /**
+   * Run on every return to the page (`visibilitychange` → visible /
+   * `pageshow`). Either completes a genuine wallet callback, or — when the
+   * user came back WITHOUT finishing a deep-link connect — un-freezes the UI.
+   *
+   * Without this, an abandoned deep-link leaves the adapter `isConnecting`,
+   * the manager's `inflightConnect` slot occupied, and the FlowMachine stuck
+   * in `'connecting'`, so every wallet button stays disabled (issue 2).
+   */
+  function recoverOrResume(): void {
+    if (destroyed || !deepLinkAdapter) return
+    if (tryResumeFromCallback()) {
+      // Completed: drop the dangling inflight slot (the adapter's connect
+      // promise never resolved, so the manager's `finally` never ran).
+      inflightConnect = null
+      inflightWalletId = null
+      return
+    }
+    const state = machine.getState()
+    if (state === 'connecting' || state === 'signing') {
+      deepLinkAdapter.cancelPendingConnect()
+      inflightConnect = null
+      inflightWalletId = null
+      // RESET notifies subscribers via the machine subscription (re-enables
+      // the modal buttons). Pending state is preserved by cancelPendingConnect
+      // so a late callback can still resume on a real navigation.
+      machine.send({ type: 'RESET' })
     }
   }
 
@@ -682,6 +779,7 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
       destroyed = true
       unsubscribeStateChange()
       if (unsubscribeDiscovery) unsubscribeDiscovery()
+      if (removeReturnListeners) removeReturnListeners()
       listeners.clear()
       if (discoveryHandle) discoveryHandle.destroy()
       if (deepLinkAdapter) deepLinkAdapter.destroy()
@@ -696,7 +794,7 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
  */
 function walletConfigMatchesName(walletConfig: WalletConfig, name: string): boolean {
   if (walletConfig.standardName && walletConfig.standardName === name) return true
-  return walletConfig.name.toLowerCase() === name.toLowerCase()
+  return normalizeWalletName(walletConfig.name) === normalizeWalletName(name)
 }
 
 function createDeepLinkAdapterForConfig(

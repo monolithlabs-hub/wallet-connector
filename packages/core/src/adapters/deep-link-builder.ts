@@ -85,7 +85,22 @@ export function generateEphemeralKeypair(): EphemeralKeypair {
  * is not exactly 32 bytes.
  */
 export function buildConnectUrl(wallet: WalletConfig, options: ConnectOptions): string {
-  return appendParams(wallet.universalLink, buildBaseParams(options))
+  return appendParams(requireUniversalLink(wallet), buildBaseParams(options))
+}
+
+/**
+ * A connect URL can only be built for a wallet that exposes a `universalLink`.
+ * Install/open-only wallets (no `universalLink`) never reach here — the
+ * `WalletManager` routes them to their install page instead — but assert it
+ * so a misconfigured wallet fails loudly rather than producing `undefined?...`.
+ */
+function requireUniversalLink(wallet: WalletConfig): string {
+  if (!wallet.universalLink) {
+    throw new Error(
+      `Wallet '${wallet.id}' has no universalLink; it cannot be connected via deep link (install/open-only).`,
+    )
+  }
+  return wallet.universalLink
 }
 
 /**
@@ -101,7 +116,7 @@ export function buildConnectUrl(wallet: WalletConfig, options: ConnectOptions): 
 export function buildSignAndConnectUrl(wallet: WalletConfig, options: SignConnectOptions): string {
   const params = buildBaseParams(options)
   params.push(['sign_in_message', options.signInMessage])
-  return appendParams(wallet.universalLink, params)
+  return appendParams(requireUniversalLink(wallet), params)
 }
 
 type QueryEntry = readonly [string, string]

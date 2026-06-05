@@ -644,3 +644,102 @@ describe('DeepLinkAdapter resume happy-path with last-used pre-set', () => {
     expect(getLastUsedWallet()).toBe('phantom')
   })
 })
+
+describe('DeepLinkAdapter.cancelPendingConnect', () => {
+  it('resets isConnecting and the inflight slot but preserves pending state', async () => {
+    const navigate = vi.fn<(url: string) => void>()
+    const adapter = createDeepLinkAdapter(baseOptions({ navigate }))
+    void adapter.connect({ wallet: PHANTOM })
+    expect(adapter.isConnecting).toBe(true)
+    expect(getPendingState()).not.toBeNull()
+
+    adapter.cancelPendingConnect()
+
+    expect(adapter.isConnecting).toBe(false)
+    // Pending state is kept so a genuine late callback can still resume.
+    expect(getPendingState()).not.toBeNull()
+
+    // After cancel, a fresh connect is accepted (not the wedged promise).
+    const navigate2 = navigate.mock.calls.length
+    void adapter.connect({ wallet: PHANTOM })
+    expect(navigate.mock.calls.length).toBeGreaterThan(navigate2)
+  })
+
+  it('cancels a scheduled Opindex store fallback', () => {
+    vi.stubGlobal('navigator', { userAgent: IPHONE_UA })
+    const cancel = vi.fn()
+    const scheduleFallback = vi.fn(() => cancel)
+    const adapter = createDeepLinkAdapter(baseOptions({ scheduleFallback, navigate: vi.fn() }))
+    void adapter.connect({ wallet: OPINDEX })
+    expect(scheduleFallback).toHaveBeenCalledTimes(1)
+
+    adapter.cancelPendingConnect()
+
+    expect(cancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not clear an already-connected adapter', () => {
+    const navigate = vi.fn<(url: string) => void>()
+    const adapter = createDeepLinkAdapter(baseOptions({ navigate }))
+    void adapter.connect({ wallet: PHANTOM })
+    const pending = getPendingState()
+    const dappPub = bs58.decode(pending?.ephemeralPublicKey ?? '')
+    const callbackUrl = makeCallbackUrl({
+      baseUrl: 'https://dapp.example.com/cb',
+      payload: { public_key: FAKE_PUBKEY, session: FAKE_SESSION },
+      dappPublicKey: dappPub,
+    })
+    const parsed = new URL(callbackUrl)
+    window.history.replaceState({}, '', parsed.pathname + parsed.search)
+    adapter.resumeFromCallback()
+    expect(adapter.isConnected).toBe(true)
+
+    adapter.cancelPendingConnect()
+
+    expect(adapter.isConnected).toBe(true)
+    expect(adapter.publicKey).toBe(FAKE_PUBKEY)
+  })
+})
+
+describe('DeepLinkAdapter.openInstall', () => {
+  it('navigates to installUrl when set (preferred over store URLs)', () => {
+    const navigate = vi.fn<(url: string) => void>()
+    const adapter = createDeepLinkAdapter(baseOptions({ navigate }))
+
+    adapter.openInstall({
+      ...OPINDEX,
+      installUrl: 'https://opindex.deeptap.io',
+    })
+
+    expect(navigate).toHaveBeenCalledWith('https://opindex.deeptap.io')
+  })
+
+  it('falls back to the iOS App Store URL when no installUrl', () => {
+    vi.stubGlobal('navigator', { userAgent: IPHONE_UA })
+    const navigate = vi.fn<(url: string) => void>()
+    const adapter = createDeepLinkAdapter(baseOptions({ navigate }))
+
+    adapter.openInstall(OPINDEX)
+
+    expect(navigate).toHaveBeenCalledWith(OPINDEX.appStoreUrl)
+  })
+
+  it('falls back to the Play Store URL on Android', () => {
+    vi.stubGlobal('navigator', { userAgent: ANDROID_UA })
+    const navigate = vi.fn<(url: string) => void>()
+    const adapter = createDeepLinkAdapter(baseOptions({ navigate }))
+
+    adapter.openInstall(OPINDEX)
+
+    expect(navigate).toHaveBeenCalledWith(OPINDEX.playStoreUrl)
+  })
+
+  it('no-ops when no install or store URL is configured', () => {
+    const navigate = vi.fn<(url: string) => void>()
+    const adapter = createDeepLinkAdapter(baseOptions({ navigate }))
+
+    adapter.openInstall({ id: 'opindex', name: 'Opindex', priority: 1, icon: '' })
+
+    expect(navigate).not.toHaveBeenCalled()
+  })
+})
