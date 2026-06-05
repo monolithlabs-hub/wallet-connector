@@ -4,12 +4,12 @@ How the deep-link round-trip works, what your dapp has to configure, and how Sig
 
 ## The shape of the problem
 
-Mobile Solana wallets aren't browser extensions. Phantom on iOS is an app; the user has to leave Safari to approve a connection. The library handles this transparently — your component code looks identical to the desktop flow — but it's worth understanding the round-trip because it influences a few configuration choices.
+Mobile Solana wallets aren't browser extensions. Opindex on iOS (and Phantom, Solflare, …) is an app; the user has to leave Safari to approve a connection. The library handles this transparently — your component code looks identical to the desktop flow — but it's worth understanding the round-trip because it influences a few configuration choices.
 
 ```
    ┌──────────────────┐         ┌──────────────────┐         ┌──────────────────┐
    │  Your dapp       │         │  iOS / Android   │         │  Your dapp       │
-   │  (Safari)        │  click  │  Phantom app     │approve  │  (Safari, again) │
+   │  (Safari)        │  click  │  Opindex app     │approve  │  (Safari, again) │
    │                  │ ─────▶  │                  │ ─────▶  │                  │
    │  manager.connect │         │  user approves   │         │  manager.        │
    │  navigates away  │         │  + signs SIWS    │         │    initialize()  │
@@ -19,7 +19,7 @@ Mobile Solana wallets aren't browser extensions. Phantom on iOS is an app; the u
 
 Two key implications:
 
-1. **The connect promise does NOT resolve on the calling page.** `await manager.connect('phantom')` on mobile navigates the tab away; control returns on the next page load.
+1. **The connect promise does NOT resolve on the calling page.** `await manager.connect('opindex')` on mobile navigates the tab away; control returns on the next page load.
 2. **State must survive a redirect.** The library serializes the in-flight flow to `sessionStorage` before navigating away and resumes it from the URL parameters on the return leg.
 
 If you're using `<WalletConnectProvider>` (React) or `WalletConnectPlugin` (Vue) you don't have to do anything for resume — the Provider/Plugin calls `manager.initialize()` on mount. If you're wiring a `WalletManager` manually, call `initialize()` yourself on page load.
@@ -137,7 +137,7 @@ See `packages/core/src/wallet-manager.ts` for the full `WalletManager` interface
 - **`localhost:5173` (dev) and `https://myapp.example` (prod) are different origins.** A pending state saved on dev won't be found on prod. This is rarely a problem in practice because you only call `connect()` after the page loads on a specific origin, but be aware of it.
 - **Pending state is short-lived.** The library treats `PendingState` older than 10 minutes as expired and discards it. If your user pauses for ages between leaving the page and returning, they'll see the modal reset.
 - **`window.opindex` is a legacy escape hatch, not the canonical detection path.** Real Opindex registers via Wallet Standard. The window sentinel still flips `platform.hasOpindexExtension` for backward compat, which suppresses the "Install" badge on the Opindex row. See [opindex.md](./opindex.md).
-- **The connect promise never resolves on the mobile calling page.** Don't write code like `await manager.connect('phantom'); doNextThing()` — `doNextThing` lives on the _return_ page. Use `onConnected` / `onAuthenticated` / `subscribe()` instead.
+- **The connect promise never resolves on the mobile calling page.** Don't write code like `await manager.connect('opindex'); doNextThing()` — `doNextThing` lives on the _return_ page. Use `onConnected` / `onAuthenticated` / `subscribe()` instead.
 
 ## Where to look in the source
 
