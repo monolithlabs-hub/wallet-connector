@@ -71,6 +71,30 @@ test.describe('Desktop flow', () => {
     await expect(opindexButton).toContainText('Install')
   })
 
+  test('clicking Opindex without the extension opens the Chrome Web Store in a new tab', async ({
+    page,
+    context,
+  }) => {
+    // Intercept the Chrome Web Store navigation so the popup doesn't actually
+    // hit the network. Serve a 200 stub so the popup navigates to (and parks
+    // on) the requested URL — a 204 would leave it on about:blank.
+    await context.route('**/chromewebstore.google.com/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'text/html', body: '<html></html>' }),
+    )
+
+    await page.goto('/')
+    await page.getByRole('button', { name: /connect wallet/i }).click()
+
+    const opindexButton = page.locator('[data-wallet-id="opindex"]')
+    await expect(opindexButton).toBeVisible()
+
+    // The manager calls window.open(extensionUrl, '_blank', ...) — a new tab.
+    const [popup] = await Promise.all([context.waitForEvent('page'), opindexButton.click()])
+    await popup.waitForURL(/chromewebstore\.google\.com/)
+    expect(new URL(popup.url()).hostname).toBe('chromewebstore.google.com')
+    await popup.close()
+  })
+
   test('Opindex carries the "Detected" badge on desktop with the extension', async ({ page }) => {
     await page.addInitScript(() => {
       ;(window as unknown as { opindex: { isOpindex: true } }).opindex = {

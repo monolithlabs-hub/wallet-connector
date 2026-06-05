@@ -88,6 +88,27 @@ export interface DeepLinkAdapter {
    */
   resumeFromCallback(): CallbackResult | null
   /**
+   * Navigate to the wallet's download / landing page for an "install/open-only"
+   * wallet (one with no `universalLink`, so no external mobile connect — e.g.
+   * Opindex). Target preference: `installUrl`, then the platform store URL.
+   * No handshake, no pending state. No-op if no target URL is configured.
+   * Uses the injectable `navigate`, so tests can capture the URL.
+   */
+  openInstall(wallet: WalletConfig): void
+  /**
+   * Abandon an in-flight `connect()` without disconnecting. Resets the
+   * `isConnecting` flag, drops the never-resolving inflight promise, and
+   * cancels any pending store-fallback timer.
+   *
+   * Unlike {@link disconnect}, this **preserves** the persisted pending
+   * state in `sessionStorage` so a genuine wallet callback that arrives on a
+   * later real page-load can still resume via {@link resumeFromCallback}. Use
+   * it when the user navigates back to the dapp without completing the wallet
+   * round-trip (e.g. switched apps and returned) — the manager calls this on
+   * `visibilitychange` / `pageshow` to un-freeze the UI.
+   */
+  cancelPendingConnect(): void
+  /**
    * Clear local session state. Mobile wallets don't expose a universal
    * disconnect deep link the same way they do for connect, so this is
    * local-only.
@@ -209,7 +230,8 @@ export function createDeepLinkAdapter(options: DeepLinkAdapterOptions): DeepLink
     if (wallet.id === OPINDEX_ID && shouldUseStoreFallback()) {
       const platform = detectPlatform()
       const storeUrl =
-        platform.isMobile && userAgentIsAndroid() ? wallet.playStoreUrl : wallet.appStoreUrl
+        wallet.installUrl ??
+        (platform.isMobile && userAgentIsAndroid() ? wallet.playStoreUrl : wallet.appStoreUrl)
       // Empty store URL would just no-op-navigate after 1500ms; skip the
       // fallback entirely and let the wallet's deep-link intercept be the
       // only outcome.
@@ -285,6 +307,27 @@ export function createDeepLinkAdapter(options: DeepLinkAdapterOptions): DeepLink
     return result
   }
 
+  function openInstall(wallet: WalletConfig): void {
+    assertAlive()
+    const target =
+      wallet.installUrl ?? (userAgentIsAndroid() ? wallet.playStoreUrl : wallet.appStoreUrl)
+    if (target) navigate(target)
+  }
+
+  function cancelPendingConnect(): void {
+    assertAlive()
+    // Only resets the *in-flight* connect machinery. Pending state in
+    // sessionStorage is intentionally left intact so a late callback can
+    // still resume on a real page-load; publicKey / isConnected are untouched
+    // so an already-connected adapter is unaffected.
+    isConnecting = false
+    inflightConnect = null
+    if (cancelFallback) {
+      cancelFallback()
+      cancelFallback = null
+    }
+  }
+
   async function disconnect(): Promise<void> {
     assertAlive()
     const wasConnected = isConnected
@@ -334,6 +377,8 @@ export function createDeepLinkAdapter(options: DeepLinkAdapterOptions): DeepLink
     },
     connect,
     resumeFromCallback,
+    openInstall,
+    cancelPendingConnect,
     disconnect,
     signMessage,
     signIn,

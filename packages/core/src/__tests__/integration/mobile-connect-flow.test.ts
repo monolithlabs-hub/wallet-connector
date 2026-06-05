@@ -513,3 +513,83 @@ describe('Mobile deep-link connect flow (integration)', () => {
     clearPendingState()
   })
 })
+
+// Opindex as it really is: no universalLink (no external connect protocol),
+// just a download/landing page. Marked "install/open-only".
+const OPINDEX_INSTALL_ONLY: WalletConfig = {
+  id: 'opindex',
+  name: 'Opindex',
+  priority: 10,
+  icon: '',
+  deepLinkScheme: 'opindexwallet://',
+  installUrl: 'https://opindex.deeptap.io',
+}
+
+describe('Mobile install/open-only wallet (Opindex has no deep-link connect)', () => {
+  it('routes to installUrl, leaves no pending state, and returns to idle', async () => {
+    const onError = vi.fn()
+    const manager = createWalletManager({
+      wallets: [OPINDEX_INSTALL_ONLY, PHANTOM],
+      onError,
+    })
+
+    await manager.connect('opindex')
+
+    expect(mocks.navigateSpy).toHaveBeenCalledWith('https://opindex.deeptap.io')
+    expect(getPendingState()).toBeNull()
+    expect(manager.getState()).toBe('idle')
+    expect(onError).not.toHaveBeenCalled()
+
+    manager.destroy()
+  })
+})
+
+describe('Mobile deep-link recovery on abandoned return (issue 2)', () => {
+  it('un-freezes the modal when the user returns without completing connect', async () => {
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+    const states: FlowState[] = []
+    manager.subscribe((s) => states.push(s))
+
+    // Tap connect → navigates away, machine enters 'connecting'.
+    void manager.connect('phantom')
+    await vi.waitFor(() => expect(mocks.navigateSpy).toHaveBeenCalledTimes(1))
+    expect(manager.getState()).toBe('connecting')
+    expect(getPendingState()).not.toBeNull()
+
+    // User switches back WITHOUT a callback in the URL (clean dapp origin).
+    document.dispatchEvent(new Event('visibilitychange'))
+
+    // Flow is reset to idle so the UI re-enables.
+    expect(manager.getState()).toBe('idle')
+    expect(states).toContain('idle')
+
+    // And a fresh connect for ANY wallet is now accepted (not wedged).
+    await vi.waitFor(() => expect(mocks.navigateSpy).toHaveBeenCalledTimes(1))
+    void manager.connect('phantom')
+    await vi.waitFor(() => expect(mocks.navigateSpy).toHaveBeenCalledTimes(2))
+
+    manager.destroy()
+  })
+
+  it('completes the connection when the return DOES carry a valid callback (pageshow)', async () => {
+    const onConnected = vi.fn()
+    const manager = createWalletManager({ wallets: [PHANTOM], onConnected })
+
+    void manager.connect('phantom')
+    await vi.waitFor(() => expect(mocks.navigateSpy).toHaveBeenCalledTimes(1))
+
+    // Simulate the wallet redirect arriving on the SAME context (bfcache).
+    const callbackUrl = buildWalletCallbackUrl({
+      publicKey: 'PK_FROM_WALLET',
+      session: 'session-token',
+    })
+    navigateTo(callbackUrl)
+    window.dispatchEvent(new Event('pageshow'))
+
+    expect(onConnected).toHaveBeenCalledWith('PK_FROM_WALLET')
+    expect(manager.getState()).toBe('authenticated')
+    expect(getPendingState()).toBeNull()
+
+    manager.destroy()
+  })
+})

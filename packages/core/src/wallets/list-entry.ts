@@ -50,6 +50,10 @@ export interface WalletListEntry {
   appStoreUrl?: string
   /** Google Play URL — present only on configured entries. */
   playStoreUrl?: string
+  /** Mobile download / landing page (e.g. `https://opindex.deeptap.io`) — present only on configured entries that set it. */
+  installUrl?: string
+  /** Desktop browser-extension install page (e.g. Chrome Web Store) — present only on configured entries that set it. */
+  extensionUrl?: string
   /** Wallet Standard registration name — populated for any entry that matched (configured) or originated from (discovered) a registered wallet. */
   standardName?: WalletName
 }
@@ -74,6 +78,27 @@ export function walletNameSlug(name: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
+}
+
+/**
+ * {@link walletNameSlug} with a trailing `-wallet` segment stripped, so the
+ * extremely common "X" vs "X Wallet" registration variance collapses to one
+ * key. Used for matching a {@link WalletConfig} against a Wallet Standard
+ * registration name when no explicit `standardName` is set.
+ *
+ * Examples:
+ * - `'Opindex'` → `'opindex'`, `'Opindex Wallet'` → `'opindex'` (they merge)
+ * - `'Trust Wallet'` → `'trust'`, `'Trust'` → `'trust'`
+ * - `'Wallet'` → `'wallet'` (a bare "Wallet" is NOT stripped to empty)
+ *
+ * The trailing-word strip is deliberately conservative: it only removes a
+ * final `-wallet` token, never an interior one, so distinct wallets like
+ * `'Phantom'` and `'Opindex'` never collide.
+ */
+export function normalizeWalletName(name: string): string {
+  const slug = walletNameSlug(name)
+  const stripped = slug.replace(/-wallet$/, '')
+  return stripped === '' ? slug : stripped
 }
 
 /**
@@ -134,8 +159,11 @@ function findAdapterFor(
     const byStandardName = adapters.find((a) => a.wallet.name === config.standardName)
     if (byStandardName) return byStandardName
   }
-  const lower = config.name.toLowerCase()
-  return adapters.find((a) => a.wallet.name.toLowerCase() === lower) ?? null
+  // Normalized match tolerates the common "X" vs "X Wallet" registration
+  // variance (e.g. configured 'Opindex' vs registered 'Opindex Wallet'), so
+  // the two collapse into a single detected entry instead of duplicating.
+  const target = normalizeWalletName(config.name)
+  return adapters.find((a) => normalizeWalletName(a.wallet.name) === target) ?? null
 }
 
 function toConfiguredEntry(
@@ -143,17 +171,27 @@ function toConfiguredEntry(
   adapter: StandardWalletAdapter | null,
 ): WalletListEntry {
   const discoveredIcon = adapter?.wallet.icon ?? ''
+  // When the wallet is actually detected via Wallet Standard, prefer the live
+  // registry branding (icon + name) — it reflects the installed wallet the
+  // user recognizes (e.g. the colorful "Opindex Wallet" logo) rather than the
+  // dapp's generic placeholder. Falls back to the configured values when the
+  // registry doesn't provide them, or when the wallet isn't detected.
   const entry: WalletListEntry = {
     id: config.id,
-    name: config.name,
-    icon: config.icon || discoveredIcon,
+    name: adapter ? adapter.wallet.name : config.name,
+    icon: adapter ? discoveredIcon || config.icon : config.icon || discoveredIcon,
     priority: config.priority,
     isDetected: adapter !== null,
     source: 'configured',
-    deepLinkScheme: config.deepLinkScheme,
-    universalLink: config.universalLink,
-    appStoreUrl: config.appStoreUrl,
-    playStoreUrl: config.playStoreUrl,
+    // Optional deep-link / install fields are spread conditionally so an
+    // unset field stays *absent* rather than `undefined` — required under
+    // the project's `exactOptionalPropertyTypes`.
+    ...(config.deepLinkScheme !== undefined && { deepLinkScheme: config.deepLinkScheme }),
+    ...(config.universalLink !== undefined && { universalLink: config.universalLink }),
+    ...(config.appStoreUrl !== undefined && { appStoreUrl: config.appStoreUrl }),
+    ...(config.playStoreUrl !== undefined && { playStoreUrl: config.playStoreUrl }),
+    ...(config.installUrl !== undefined && { installUrl: config.installUrl }),
+    ...(config.extensionUrl !== undefined && { extensionUrl: config.extensionUrl }),
   }
   // standardName is preserved when present on the config OR derivable from a
   // matched adapter — gives consumers a stable Wallet-Standard handle even

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { StandardWalletAdapter } from '../adapters/standard-wallet-adapter'
 import { asWalletName } from '../wallet-name'
 
-import { mergeWalletList, walletNameSlug } from './list-entry'
+import { mergeWalletList, normalizeWalletName, walletNameSlug } from './list-entry'
 import type { WalletConfig } from './sorter'
 
 const stubMeta = {
@@ -55,7 +55,54 @@ describe('walletNameSlug', () => {
   })
 })
 
+describe('normalizeWalletName', () => {
+  it('collapses the "X" vs "X Wallet" variance to one key', () => {
+    expect(normalizeWalletName('Opindex')).toBe('opindex')
+    expect(normalizeWalletName('Opindex Wallet')).toBe('opindex')
+    expect(normalizeWalletName('Trust')).toBe('trust')
+    expect(normalizeWalletName('Trust Wallet')).toBe('trust')
+  })
+
+  it('does not strip a bare "Wallet" down to empty', () => {
+    expect(normalizeWalletName('Wallet')).toBe('wallet')
+  })
+
+  it('only strips a trailing wallet token, never an interior one', () => {
+    expect(normalizeWalletName('Wallet Connect')).toBe('wallet-connect')
+    // Distinct wallets must never normalize to the same key.
+    expect(normalizeWalletName('Phantom')).not.toBe(normalizeWalletName('Opindex'))
+  })
+})
+
 describe('mergeWalletList', () => {
+  it('merges configured "Opindex" with discovered "Opindex Wallet" into one detected entry', () => {
+    // The exact opin.art bug: configured 'Opindex' (no standardName) + the
+    // in-app registry name 'Opindex Wallet' must collapse to a single
+    // detected, configured row — not two rows.
+    const adapter = makeAdapter('Opindex Wallet', 'data:image/svg+xml;base64,OPINDEX')
+
+    const result = mergeWalletList([opindex], [adapter])
+
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({
+      id: 'opindex',
+      name: 'Opindex Wallet',
+      icon: 'data:image/svg+xml;base64,OPINDEX',
+      isDetected: true,
+      source: 'configured',
+    })
+  })
+
+  it('does NOT over-merge distinct wallets (Opindex must not absorb "Phantom Wallet")', () => {
+    const adapter = makeAdapter('Phantom Wallet')
+
+    const result = mergeWalletList([opindex], [adapter])
+
+    expect(result).toHaveLength(2)
+    expect(result[0]).toMatchObject({ id: 'opindex', isDetected: false })
+    expect(result[1]).toMatchObject({ source: 'discovered', name: 'Phantom Wallet' })
+  })
+
   it('returns an empty list when both inputs are empty', () => {
     expect(mergeWalletList([], [])).toEqual([])
   })
@@ -92,9 +139,30 @@ describe('mergeWalletList', () => {
     expect(entry?.isDetected).toBe(true)
   })
 
-  it('configured icon wins over the adapter icon when both are present', () => {
+  it('prefers the detected adapter icon over the configured icon when detected', () => {
+    // When a wallet is actually installed, show its live registry branding so
+    // the user sees the logo they recognize (decided UX) — not the dapp's
+    // generic placeholder icon.
     const config: WalletConfig = { ...phantom, icon: 'https://example.com/phantom.png' }
     const adapter = makeAdapter('Phantom', 'data:image/svg+xml;base64,DISCOVERED')
+
+    const [entry] = mergeWalletList([config], [adapter])
+
+    expect(entry?.icon).toBe('data:image/svg+xml;base64,DISCOVERED')
+  })
+
+  it('prefers the detected adapter name over the configured name when detected', () => {
+    const config: WalletConfig = { ...stubMeta, id: 'opindex', name: 'Opindex', priority: 1 }
+    const adapter = makeAdapter('Opindex Wallet')
+
+    const [entry] = mergeWalletList([config], [adapter])
+
+    expect(entry).toMatchObject({ id: 'opindex', name: 'Opindex Wallet', isDetected: true })
+  })
+
+  it('keeps the configured icon when the detected adapter has no icon', () => {
+    const config: WalletConfig = { ...phantom, icon: 'https://example.com/phantom.png' }
+    const adapter = makeAdapter('Phantom', '')
 
     const [entry] = mergeWalletList([config], [adapter])
 

@@ -19,14 +19,37 @@ export interface WalletConfig {
   priority: number
   /** URL or data URI for the wallet's logo. */
   icon: string
-  /** Custom URL scheme (e.g., `phantom://`) used for the deep-link probe. */
-  deepLinkScheme: string
-  /** HTTPS universal link (e.g., `https://phantom.app/ul/v1/connect`). */
-  universalLink: string
-  /** iOS App Store URL — used as the fallback when the deep link is not intercepted. */
-  appStoreUrl: string
-  /** Google Play URL — Android fallback. */
-  playStoreUrl: string
+  /** Custom URL scheme (e.g., `phantom://`) used for the deep-link probe. Optional. */
+  deepLinkScheme?: string
+  /**
+   * HTTPS universal link (e.g., `https://phantom.app/ul/v1/connect`) used to
+   * build the Phantom-style connect deep link on mobile.
+   *
+   * **Omit this to mark a wallet as "install/open-only"** — a wallet with no
+   * external mobile connect protocol (e.g. Opindex, which only connects
+   * inside its own in-app browser via Wallet Standard). On the mobile
+   * deep-link path, selecting such a wallet navigates to `installUrl`
+   * (then `appStoreUrl`/`playStoreUrl`) instead of attempting a connect.
+   */
+  universalLink?: string
+  /** iOS App Store URL — used as the fallback when the deep link is not intercepted. Optional. */
+  appStoreUrl?: string
+  /** Google Play URL — Android fallback. Optional. */
+  playStoreUrl?: string
+  /**
+   * Mobile download / landing page for installing or opening the wallet (e.g.
+   * `https://opindex.deeptap.io`). For install/open-only wallets it is the
+   * primary mobile target on the deep-link path. Takes precedence over the
+   * store URLs.
+   */
+  installUrl?: string
+  /**
+   * Desktop browser-extension install page (e.g. the Chrome Web Store listing).
+   * On the desktop `install-prompt` strategy — no extension detected —
+   * selecting the wallet opens this in a new tab (falling back to
+   * {@link installUrl} when unset).
+   */
+  extensionUrl?: string
   /** Optional Wallet-Standard registration name (paired by TASK-107 at discovery time). */
   standardName?: WalletName
 }

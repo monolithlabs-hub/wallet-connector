@@ -185,6 +185,8 @@ function makeDeepLinkAdapter(overrides: Partial<DeepLinkAdapter> = {}): DeepLink
     isConnecting: false,
     connect: vi.fn(async () => new Promise<{ publicKey: string }>(() => {})),
     resumeFromCallback: vi.fn(() => null),
+    openInstall: vi.fn(),
+    cancelPendingConnect: vi.fn(),
     disconnect: vi.fn(async () => undefined),
     signMessage: vi.fn(async () => {
       throw new WalletNotReadyError('not implemented')
@@ -746,6 +748,57 @@ describe('createWalletManager — install-prompt strategy', () => {
 
     await expect(manager.connect('phantom')).rejects.toThrow(WalletNotReadyError)
     expect(onError).toHaveBeenCalledOnce()
+  })
+
+  it('connect() opens extensionUrl in a new tab and returns to idle (no error) when set', async () => {
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([]))
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+    const onError = vi.fn()
+    const opindex: WalletConfig = {
+      id: 'opindex',
+      name: 'Opindex',
+      priority: 10,
+      icon: '',
+      installUrl: 'https://opindex.deeptap.io',
+      extensionUrl: 'https://chromewebstore.google.com/detail/dokalonchfclkijncpagjgiamnghiaec',
+    }
+    const manager = createWalletManager({ wallets: [opindex], onError })
+
+    await expect(manager.connect('opindex')).resolves.toBeUndefined()
+
+    // Desktop prefers the browser-extension page over the mobile install page.
+    expect(openSpy).toHaveBeenCalledWith(
+      'https://chromewebstore.google.com/detail/dokalonchfclkijncpagjgiamnghiaec',
+      '_blank',
+      'noopener,noreferrer',
+    )
+    expect(manager.getState()).toBe('idle')
+    expect(onError).not.toHaveBeenCalled()
+
+    openSpy.mockRestore()
+  })
+
+  it('connect() falls back to installUrl on desktop when no extensionUrl is set', async () => {
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([]))
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+    const opindex: WalletConfig = {
+      id: 'opindex',
+      name: 'Opindex',
+      priority: 10,
+      icon: '',
+      installUrl: 'https://opindex.deeptap.io',
+    }
+    const manager = createWalletManager({ wallets: [opindex] })
+
+    await manager.connect('opindex')
+
+    expect(openSpy).toHaveBeenCalledWith(
+      'https://opindex.deeptap.io',
+      '_blank',
+      'noopener,noreferrer',
+    )
+
+    openSpy.mockRestore()
   })
 })
 

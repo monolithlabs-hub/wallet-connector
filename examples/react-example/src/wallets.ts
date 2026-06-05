@@ -15,15 +15,23 @@ const OPINDEX_ICON =
       '</svg>',
   )
 
+// Opindex is an "install/open-only" wallet on mobile: it has NO external
+// mobile connect protocol (no Phantom-style universal link). It only connects
+// inside its own in-app browser, where it registers via Wallet Standard as
+// "Opindex Wallet". So we omit `universalLink` (which marks it install/open-only).
+// - Mobile browser → `installUrl` (download/landing page).
+// - Desktop without the extension → `extensionUrl` (Chrome Web Store), opened
+//   in a new tab; once installed it's detected via Wallet Standard.
+// - In-app browser / with extension → detected and merged into one row.
 export const OPINDEX: WalletConfig = {
   id: 'opindex',
   name: 'Opindex',
   priority: 10,
   icon: OPINDEX_ICON,
-  deepLinkScheme: 'opindex://',
-  universalLink: 'https://opindex.app/ul/v1/connect',
-  appStoreUrl: 'https://apps.apple.com/app/opindex',
-  playStoreUrl: 'https://play.google.com/store/apps/details?id=opindex',
+  standardName: asWalletName('Opindex Wallet'),
+  deepLinkScheme: 'opindexwallet://',
+  installUrl: 'https://opindex.deeptap.io',
+  extensionUrl: 'https://chromewebstore.google.com/detail/dokalonchfclkijncpagjgiamnghiaec',
 }
 
 export const PHANTOM: WalletConfig = {
