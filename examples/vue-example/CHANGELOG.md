@@ -1,5 +1,14 @@
 # @monolithlabs-hub/wallet-connect-vue-example
 
+## 0.0.3
+
+### Patch Changes
+
+- Updated dependencies [d787377]
+- Updated dependencies [b3b98c7]
+  - @monolithlabs-hub/wallet-connect-core@1.4.0
+  - @monolithlabs-hub/wallet-connect-vue@1.1.1
+
 ## 0.0.2
 
 ### Patch Changes
