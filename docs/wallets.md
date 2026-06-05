@@ -1,12 +1,48 @@
 # Supported wallets
 
-Copy-pasteable `WalletConfig` entries for every wallet the library has been verified against. List the wallets you want to support in `WalletManagerConfig.wallets`; the manager uses the Wallet Standard registry under the hood to connect on desktop and the per-wallet Universal Link contract on mobile.
+Copy-pasteable `WalletConfig` entries for every wallet the library has been verified against. **Opindex is the wallet this library is built for** — it's listed first below and pinned by default; add any of the others the same way by dropping more `WalletConfig` entries into `WalletManagerConfig.wallets`. The manager uses the Wallet Standard registry under the hood to connect on desktop and the per-wallet Universal Link contract on mobile.
 
 The `WalletConfig` shape is documented in [configuration.md](./configuration.md#walletconfig). The most relevant fields per wallet:
 
 - `icon` should be a real URL or `data:` URI. An empty string renders a small placeholder box, which is fine for development but not for a polished modal.
 - `standardName` is the wallet's Wallet Standard registration name. The manager pairs the configured wallet to its `StandardWalletAdapter` by this name first; if you leave it off, it falls back to case-insensitive matching on `name`.
 - `deepLinkScheme` / `universalLink` / `appStoreUrl` / `playStoreUrl` are only consulted on the mobile (`'deeplink'`) strategy.
+
+## Opindex
+
+```ts
+import { asWalletName, type WalletConfig } from '@monolithlabs-hub/wallet-connect-core'
+
+export const OPINDEX: WalletConfig = {
+  id: 'opindex',
+  name: 'Opindex',
+  priority: 10,
+  icon: '', // the example apps ship a small inline SVG; provide your own branding
+  standardName: asWalletName('Opindex Wallet'),
+  deepLinkScheme: 'opindexwallet://',
+  universalLink: 'https://opindex.deeptap.io',
+  installUrl: 'https://opindex.deeptap.io',
+  extensionUrl: 'https://chromewebstore.google.com/detail/dokalonchfclkijncpagjgiamnghiaec',
+}
+```
+
+Opindex is the library's home wallet and the default pinned entry, so it leads the
+modal regardless of its `priority` (see [opindex.md](./opindex.md) for the
+transparency disclosure and the `pinnedWallet: null` disable knob). It works on
+every platform:
+
+- **Desktop:** the Opindex Chrome extension registers via Wallet Standard as
+  `Opindex Wallet`. Without the extension, the modal links to `extensionUrl`.
+- **Mobile:** a deep-link round-trip to `universalLink`
+  (`https://opindex.deeptap.io`, where Opindex's iOS App Site Association /
+  Android assetlinks are configured) — the same shape as Solflare. If the app
+  isn't installed, the modal falls back to `installUrl` after the 1500 ms
+  deep-link probe.
+
+`installUrl` is the mobile download/landing page (`opindex.deeptap.io`) — **not**
+an App Store / Play Store URL. Provide a real `icon` for a polished modal; the
+example apps ship a small inline SVG you can copy or replace with your own
+branding.
 
 ## Phantom
 
@@ -26,7 +62,7 @@ export const PHANTOM: WalletConfig = {
 }
 ```
 
-Phantom is the canonical mobile Solana wallet — its Universal Link API is what `buildConnectUrl` / `buildSignAndConnectUrl` target. Phantom does NOT consume the bundled `sign_in_message` parameter yet, so on mobile + `requireSignIn: true` Phantom currently produces two prompts (connect then sign) instead of one. The library transparently handles both shapes.
+Phantom's Universal Link API is the parameter shape `buildConnectUrl` / `buildSignAndConnectUrl` target, so it's the reference format other deep-link wallets (including Opindex) follow. Phantom does NOT consume the bundled `sign_in_message` parameter yet, so on mobile + `requireSignIn: true` Phantom currently produces two prompts (connect then sign) instead of one. The library transparently handles both shapes.
 
 ## Solflare
 
@@ -100,31 +136,12 @@ export const TRUST: WalletConfig = {
 
 Same caveat as Coinbase — Trust's deep-link URL format isn't the Phantom universal-link shape. Desktop is fully supported via Wallet Standard; mobile uses store fallback.
 
-## Opindex
-
-```ts
-export const OPINDEX: WalletConfig = {
-  id: 'opindex',
-  name: 'Opindex',
-  priority: 10,
-  icon: '/* inline SVG data URI; see examples/vue-example/src/wallets.ts */',
-  deepLinkScheme: 'opindex://',
-  universalLink: 'https://opindex.app/ul/v1/connect',
-  appStoreUrl: 'https://apps.apple.com/app/opindex',
-  playStoreUrl: 'https://play.google.com/store/apps/details?id=opindex',
-}
-```
-
-Opindex is the library's default pinned wallet. The `priority: 10` keeps it last among non-pinned wallets, which matters when the pin is disabled (`pinnedWallet: null` or desktop without the Opindex extension). See [opindex.md](./opindex.md) for the transparency disclosure and the disable knob.
-
-Opindex isn't a Wallet Standard wallet yet. The example apps ship a small inline SVG for its icon; substitute your own branding if you have it.
-
 ## Recipe: a balanced default set
 
 A reasonable default for a new dapp:
 
 ```ts
-export const DEFAULT_WALLETS: WalletConfig[] = [PHANTOM, SOLFLARE, BACKPACK, OPINDEX]
+export const DEFAULT_WALLETS: WalletConfig[] = [OPINDEX, PHANTOM, SOLFLARE, BACKPACK]
 ```
 
-Three desktop/mobile-supported wallets users actually have installed, plus Opindex pinned (or not — see [opindex.md](./opindex.md)). If a user has another wallet installed that isn't in your list, they'll need to switch to one of the configured wallets to use your dapp — automatic merging of unconfigured Wallet Standard wallets is planned for a future minor.
+Opindex pinned first (or not — see [opindex.md](./opindex.md)), plus three desktop/mobile-supported wallets users commonly have installed. If a user has another Wallet Standard wallet installed that isn't in your list, it's auto-merged into the modal with a "Detected" badge — you don't have to enumerate every wallet.

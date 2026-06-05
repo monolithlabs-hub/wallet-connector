@@ -2,19 +2,19 @@
 
 Zero to a working Connect Wallet button in under ten minutes. Pick **React** or **Vue** below — the rest of the API surface is identical between the two.
 
-> Looking for a runnable reference? See `examples/vue-example/` — Vue 3.5 + Vite demo with four scenarios (basic connect, SIWS sign-in, custom priority, neutral mode). Run with `pnpm --filter @monolithlabs-hub/wallet-connect-vue-example dev`. A matching React example is planned (PLAN.md TASK-601).
+> Looking for a runnable reference? See `examples/react-example/` and `examples/vue-example/` — Vite demos with four scenarios each (basic connect, SIWS sign-in, custom priority, neutral mode), both wiring Opindex first. Run with `pnpm --filter @monolithlabs-hub/wallet-connect-react-example dev` (or `…-vue-example dev`).
 
 ## What you'll build
 
-A page-level button that, when clicked, opens a wallet picker, runs the connect flow against the user's chosen wallet (browser extension or mobile wallet via deep link), and exposes the connected public key to your app. Three of the most common Solana wallets — Phantom, Solflare, and Opindex — are wired up by default.
+A page-level button that, when clicked, opens a wallet picker, runs the connect flow against the user's chosen wallet (browser extension or mobile wallet via deep link), and exposes the connected public key to your app. Opindex leads the list, with other common Solana wallets like Phantom and Solflare added alongside.
 
 ```
 ┌────────────────────────────┐         ┌───────────────────────────┐
 │  [ Connect Wallet ]        │  click  │   Select a wallet         │
 │                            │  ────▶  │                           │
+│                            │         │   ▣ Opindex               │
 │                            │         │   ▣ Phantom               │
 │                            │         │   ▣ Solflare              │
-│                            │         │   ▣ Opindex     Install   │
 └────────────────────────────┘         └───────────────────────────┘
 ```
 
@@ -45,30 +45,32 @@ The manager is the single source of truth for the connect flow. You define it on
 // src/wallets.ts
 import { asWalletName, type WalletConfig } from '@monolithlabs-hub/wallet-connect-core'
 
-export const PHANTOM: WalletConfig = {
-  id: 'phantom',
-  name: 'Phantom',
+export const OPINDEX: WalletConfig = {
+  id: 'opindex',
+  name: 'Opindex',
   priority: 1,
   icon: '', // empty renders a placeholder box; provide a real URL/data URI for a polished modal
-  standardName: asWalletName('Phantom'),
-  deepLinkScheme: 'phantom://',
-  universalLink: 'https://phantom.app/ul/v1/connect',
-  appStoreUrl: 'https://apps.apple.com/app/phantom-crypto-wallet/id1598432977',
-  playStoreUrl: 'https://play.google.com/store/apps/details?id=app.phantom',
+  standardName: asWalletName('Opindex Wallet'),
+  deepLinkScheme: 'opindexwallet://',
+  universalLink: 'https://opindex.deeptap.io',
+  installUrl: 'https://opindex.deeptap.io',
+  extensionUrl: 'https://chromewebstore.google.com/detail/dokalonchfclkijncpagjgiamnghiaec',
 }
 ```
+
+> Adding more wallets is just more `WalletConfig` entries — `export const PHANTOM`, `export const SOLFLARE`, and so on, then list them all in `wallets`. Copy-paste recipes live in [wallets.md](./wallets.md).
 
 ```tsx
 // src/App.tsx
 import type { WalletManagerConfig } from '@monolithlabs-hub/wallet-connect-core'
 import { ConnectButton, WalletConnectProvider } from '@monolithlabs-hub/wallet-connect-react'
 
-import { PHANTOM } from './wallets'
+import { OPINDEX } from './wallets'
 
 // Module-scope so the object identity is stable across re-renders. An
 // inline `{...}` literal would force the manager to rebuild every render.
 const config: WalletManagerConfig = {
-  wallets: [PHANTOM],
+  wallets: [OPINDEX],
 }
 
 export function App() {
@@ -80,7 +82,7 @@ export function App() {
 }
 ```
 
-That's the minimum viable connect button. Click it; the modal opens; pick Phantom; approve in the wallet; your app is connected.
+That's the minimum viable connect button. Click it; the modal opens; pick Opindex; approve in the wallet; your app is connected.
 
 ### Vue
 
@@ -90,10 +92,10 @@ import { createApp } from 'vue'
 import { WalletConnectPlugin } from '@monolithlabs-hub/wallet-connect-vue'
 
 import App from './App.vue'
-import { PHANTOM } from './wallets'
+import { OPINDEX } from './wallets'
 
 createApp(App)
-  .use(WalletConnectPlugin, { wallets: [PHANTOM] })
+  .use(WalletConnectPlugin, { wallets: [OPINDEX] })
   .mount('#app')
 ```
 
@@ -153,7 +155,7 @@ Set `requireSignIn: true` and provide a `signInMessage`. After the wallet return
 
 ```ts
 const config: WalletManagerConfig = {
-  wallets: [PHANTOM],
+  wallets: [OPINDEX],
   requireSignIn: true,
   signInMessage: (publicKey) =>
     publicKey === ''
@@ -169,14 +171,14 @@ See [configuration.md](./configuration.md) for the full callback list.
 
 ## 5. Initialize on page load
 
-Mobile flows complete in a redirect round-trip. The user clicks "Phantom" in your modal, leaves the page to approve in the Phantom app, and lands back on your site. The Provider (React) / Plugin (Vue) automatically calls `manager.initialize()` on mount to detect that callback and resume the flow — you don't have to call anything yourself.
+Mobile flows complete in a redirect round-trip. The user taps "Opindex" in your modal, leaves the page to approve in the Opindex app, and lands back on your site. The Provider (React) / Plugin (Vue) automatically calls `manager.initialize()` on mount to detect that callback and resume the flow — you don't have to call anything yourself.
 
 The Provider/Plugin layer takes care of this; you only need to think about it if you're wiring a `WalletManager` manually outside React or Vue. See [mobile.md](./mobile.md) for the deep-link flow internals.
 
 ## What's next
 
 - [configuration.md](./configuration.md) — every `WalletManagerConfig` option, type, default, and example.
-- [wallets.md](./wallets.md) — copy-pasteable configs for Phantom, Solflare, Backpack, Coinbase Wallet, Trust, and Opindex.
+- [wallets.md](./wallets.md) — copy-pasteable configs for Opindex, Phantom, Solflare, Backpack, Coinbase Wallet, and Trust.
 - [mobile.md](./mobile.md) — how the mobile deep-link round-trip works, callback URL setup, SIWS bundling.
 - [opindex.md](./opindex.md) — what Opindex pinning does and how to disable it.
 - [contributing.md](./contributing.md) — adding a new wallet adapter.

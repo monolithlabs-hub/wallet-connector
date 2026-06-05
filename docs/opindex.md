@@ -18,7 +18,7 @@ That's it. The rest of this page explains what the pin does, why it's there, and
 The default `pinnedWallet: 'opindex'` triggers two platform-aware behaviors:
 
 1. **Sort order.** Opindex moves to index 0 of the wallet list on:
-   - Mobile (always — iOS can't probe for an installed Opindex app, so we show it unconditionally and the deep link falls back to the App Store after 1500 ms if the app isn't installed).
+   - Mobile (always — iOS can't probe for an installed Opindex app, so we show it unconditionally; tapping it deep-links to Opindex and falls back to its install page (`installUrl`, `https://opindex.deeptap.io`) after 1500 ms if the app isn't installed).
    - Desktop **with the Opindex extension detected** (via Wallet Standard registration or the legacy `window.opindex.isOpindex` sentinel).
 
    On desktop **without** the Opindex extension, Opindex is NOT pinned — it sorts by `priority` like everything else. That's how the example app shows Opindex at the bottom when you don't have it installed.

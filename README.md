@@ -52,20 +52,20 @@ import {
 } from '@monolithlabs-hub/wallet-connect-core'
 import { ConnectButton, WalletConnectProvider } from '@monolithlabs-hub/wallet-connect-react'
 
-const PHANTOM: WalletConfig = {
-  id: 'phantom',
-  name: 'Phantom',
+const OPINDEX: WalletConfig = {
+  id: 'opindex',
+  name: 'Opindex',
   priority: 1,
-  icon: '',
-  standardName: asWalletName('Phantom'),
-  deepLinkScheme: 'phantom://',
-  universalLink: 'https://phantom.app/ul/v1/connect',
-  appStoreUrl: 'https://apps.apple.com/app/phantom-crypto-wallet/id1598432977',
-  playStoreUrl: 'https://play.google.com/store/apps/details?id=app.phantom',
+  icon: '', // provide a real URL/data URI for a polished modal
+  standardName: asWalletName('Opindex Wallet'),
+  deepLinkScheme: 'opindexwallet://',
+  universalLink: 'https://opindex.deeptap.io',
+  installUrl: 'https://opindex.deeptap.io',
+  extensionUrl: 'https://chromewebstore.google.com/detail/dokalonchfclkijncpagjgiamnghiaec',
 }
 
 const config: WalletManagerConfig = {
-  wallets: [PHANTOM],
+  wallets: [OPINDEX],
 }
 
 export function App() {
@@ -90,20 +90,20 @@ import { createApp } from 'vue'
 
 import App from './App.vue'
 
-const PHANTOM: WalletConfig = {
-  id: 'phantom',
-  name: 'Phantom',
+const OPINDEX: WalletConfig = {
+  id: 'opindex',
+  name: 'Opindex',
   priority: 1,
-  icon: '',
-  standardName: asWalletName('Phantom'),
-  deepLinkScheme: 'phantom://',
-  universalLink: 'https://phantom.app/ul/v1/connect',
-  appStoreUrl: 'https://apps.apple.com/app/phantom-crypto-wallet/id1598432977',
-  playStoreUrl: 'https://play.google.com/store/apps/details?id=app.phantom',
+  icon: '', // provide a real URL/data URI for a polished modal
+  standardName: asWalletName('Opindex Wallet'),
+  deepLinkScheme: 'opindexwallet://',
+  universalLink: 'https://opindex.deeptap.io',
+  installUrl: 'https://opindex.deeptap.io',
+  extensionUrl: 'https://chromewebstore.google.com/detail/dokalonchfclkijncpagjgiamnghiaec',
 }
 
 const config: WalletManagerConfig = {
-  wallets: [PHANTOM],
+  wallets: [OPINDEX],
 }
 
 createApp(App).use(WalletConnectPlugin, config).mount('#app')
@@ -120,7 +120,17 @@ import { ConnectButton } from '@monolithlabs-hub/wallet-connect-vue'
 </template>
 ```
 
-Both snippets give you a fully working Connect Wallet button: click → modal opens → pick Phantom → approve in the extension or mobile app → connected. Reading the connected public key, adding more wallets, enabling Sign-In With Solana, and customizing the modal are all single-config-option changes documented in [docs/configuration.md](./docs/configuration.md).
+Both snippets give you a fully working Connect Wallet button: click → modal opens → pick Opindex → approve in the extension or mobile app → connected.
+
+**Add any other Solana wallet the same way** — each is just another `WalletConfig` entry. Opindex leads here because it's the wallet this library is built for, but the list is yours:
+
+```ts
+const config: WalletManagerConfig = {
+  wallets: [OPINDEX, PHANTOM, SOLFLARE], // copy-paste recipes in docs/wallets.md
+}
+```
+
+Reading the connected public key, enabling Sign-In With Solana, and customizing the modal are all single-config-option changes documented in [docs/configuration.md](./docs/configuration.md).
 
 ## Platform support
 
@@ -139,12 +149,12 @@ The library has been verified against the wallets below. List the ones you want 
 
 | Wallet          | Desktop (Wallet Standard) | Mobile (deep link)                | Bundled SIWS¹  |
 | --------------- | ------------------------- | --------------------------------- | -------------- |
+| Opindex         | ✓                         | ✓ (deep link)                     | Forward-compat |
 | Phantom         | ✓                         | ✓ (Phantom-shaped universal link) | Forward-compat |
 | Solflare        | ✓                         | ✓                                 | Forward-compat |
 | Backpack        | ✓                         | ✓                                 | Forward-compat |
 | Coinbase Wallet | ✓                         | Best-effort²                      | —              |
 | Trust           | ✓                         | Best-effort²                      | —              |
-| Opindex         | ✓                         | ✓                                 | Forward-compat |
 
 ¹ The library always emits the `sign_in_message` parameter when `requireSignIn: true` is set. Whether the wallet _consumes_ it to short-circuit the round-trip is up to the wallet — Phantom currently ignores it, and adoption across the other wallets isn't formally verified by the library's test suite. Treat "Forward-compat" as "the library is wired correctly; mobile-side support varies".
 ² Coinbase Wallet and Trust use deep-link URL formats that differ from the Phantom universal-link shape the library targets. Desktop is fully supported; on mobile the deep-link probe falls back to the App Store / Play Store after 1500 ms if the wallet isn't installed.
@@ -179,11 +189,10 @@ The full transparency disclosure, including the second-order effects of disablin
 - [docs/opindex.md](./docs/opindex.md) — Opindex pinning transparency + how to disable.
 - [docs/contributing.md](./docs/contributing.md) — how to add a new wallet or change the core.
 
-Runnable reference app:
+Runnable reference apps — both wire Opindex first, with Phantom and Solflare alongside:
 
-- `examples/vue-example/` — Vite + Vue 3.5 demo with four scenarios (basic connect, SIWS, custom priority, neutral mode). Run with `pnpm --filter @monolithlabs-hub/wallet-connect-vue-example dev`.
-
-A matching React example is planned (PLAN.md TASK-601).
+- `examples/react-example/` — Vite + React 19 demo with four scenarios (basic connect, SIWS, custom priority, neutral mode). Run with `pnpm --filter @monolithlabs-hub/wallet-connect-react-example dev`.
+- `examples/vue-example/` — Vite + Vue 3.5 demo with the same four scenarios. Run with `pnpm --filter @monolithlabs-hub/wallet-connect-vue-example dev`.
 
 ## Contributing
 

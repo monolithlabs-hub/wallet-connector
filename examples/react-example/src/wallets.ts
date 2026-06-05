@@ -15,14 +15,16 @@ const OPINDEX_ICON =
       '</svg>',
   )
 
-// Opindex is an "install/open-only" wallet on mobile: it has NO external
-// mobile connect protocol (no Phantom-style universal link). It only connects
-// inside its own in-app browser, where it registers via Wallet Standard as
-// "Opindex Wallet". So we omit `universalLink` (which marks it install/open-only).
-// - Mobile browser → `installUrl` (download/landing page).
-// - Desktop without the extension → `extensionUrl` (Chrome Web Store), opened
-//   in a new tab; once installed it's detected via Wallet Standard.
-// - In-app browser / with extension → detected and merged into one row.
+// Opindex is a mobile DEEP-LINK wallet: on a mobile browser, tapping it
+// navigates to its universal link and the user approves in the Opindex app,
+// then returns to the dapp — the same round-trip Solflare and Phantom use.
+// Apple App Site Association / Android assetlinks are configured on
+// `opindex.deeptap.io`, so that bare domain is the deep-link target (the
+// library appends the encrypted-handshake query params to it).
+// - Mobile, app installed → opens Opindex, approve, redirect back to the dapp.
+// - Mobile, app NOT installed → `installUrl` after the 1500ms fallback timer.
+// - Desktop without the extension → `extensionUrl` (Chrome Web Store).
+// - In-app browser / with extension → detected via Wallet Standard, merged.
 export const OPINDEX: WalletConfig = {
   id: 'opindex',
   name: 'Opindex',
@@ -30,6 +32,7 @@ export const OPINDEX: WalletConfig = {
   icon: OPINDEX_ICON,
   standardName: asWalletName('Opindex Wallet'),
   deepLinkScheme: 'opindexwallet://',
+  universalLink: 'https://opindex.deeptap.io',
   installUrl: 'https://opindex.deeptap.io',
   extensionUrl: 'https://chromewebstore.google.com/detail/dokalonchfclkijncpagjgiamnghiaec',
 }

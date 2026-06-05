@@ -70,7 +70,7 @@ test.describe('Mobile flow', () => {
     await expect(opindex).toContainText(expectedLabel)
   })
 
-  test('tapping Opindex routes to the install/landing page (install/open-only wallet)', async ({
+  test('tapping Opindex starts a mobile deep-link connect, then falls back to the install page', async ({
     page,
   }) => {
     const capturedNavigations: string[] = []
@@ -84,7 +84,8 @@ test.describe('Mobile flow', () => {
         capturedNavigations.push(url)
         // `route.fulfill({status: 204})` over `route.abort()`: Chromium
         // navigates to a `chrome-error://` page on `abort()`. A 204 No
-        // Content response leaves the page state intact on all browsers.
+        // Content response leaves the page state intact (and visible) on
+        // all browsers — which is what lets the store-fallback timer fire.
         await route.fulfill({ status: 204, body: '' })
       } else {
         await route.continue()
@@ -98,17 +99,19 @@ test.describe('Mobile flow', () => {
     await expect(opindex).toBeVisible()
     await opindex.click()
 
-    // Opindex has no external deep-link connect protocol — it only
-    // connects inside its own in-app browser. Selecting it on a mobile
-    // browser navigates straight to the download/landing page, with NO
-    // universal-link probe and NO store fallback.
+    // Opindex is a mobile deep-link wallet (universalLink set): the first
+    // navigation is the universal-link connect URL carrying the encrypted
+    // handshake param `dapp_encryption_public_key`.
     await expect.poll(() => capturedNavigations.length).toBeGreaterThanOrEqual(1)
-    expect(capturedNavigations[0]).toMatch(/^https:\/\/opindex\.deeptap\.io/)
+    expect(capturedNavigations[0]).toMatch(
+      /^https:\/\/opindex\.deeptap\.io\/?\?.*dapp_encryption_public_key=/,
+    )
 
-    // Give a (non-existent) fallback a chance to fire. After 2s of wall
-    // clock there should still be exactly one navigation.
-    await page.waitForTimeout(2_000)
-    expect(capturedNavigations).toHaveLength(1)
+    // The deep link was intercepted, so the OS never opened the app and the
+    // page stays visible — the Opindex-specific 1500ms store fallback then
+    // fires a second navigation to the bare install / landing page.
+    await expect.poll(() => capturedNavigations.length, { timeout: 4_000 }).toBe(2)
+    expect(capturedNavigations[1]).toMatch(/^https:\/\/opindex\.deeptap\.io\/?$/)
   })
 
   test('returning after an abandoned deep link re-enables the wallet list (issue 2)', async ({
