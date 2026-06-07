@@ -4,7 +4,7 @@
 [![npm](https://img.shields.io/npm/v/@monolithlabs-hub/wallet-connect-react.svg)](https://www.npmjs.com/package/@monolithlabs-hub/wallet-connect-react)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](#license)
 
-A Solana wallet-connect library for React and Vue. Collapses **pick wallet → connect → sign in** into a single button that works the same on a desktop with a browser extension and on a mobile browser via deep links. Sign-In With Solana is built in; on mobile the SIWS message is bundled into the connect deep link for wallets that consume it (Solflare, Backpack), forward-compatible with wallets that don't yet (Phantom — see the wallet table footnotes).
+A Solana wallet-connect library for React and Vue. Collapses **pick wallet → connect → sign in** into a single button that works the same on a desktop with a browser extension and on a mobile browser via deep links. Sign-In With Solana is built in; on mobile the SIWS message is bundled into the connect deep link for wallets that consume it (Opindex, Solflare, Backpack), forward-compatible with wallets that don't yet (Phantom — see the wallet table footnotes).
 
 ## Highlights
 
