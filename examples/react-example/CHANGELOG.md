@@ -1,5 +1,12 @@
 # @monolithlabs-hub/wallet-connect-react-example
 
+## 0.0.4
+
+### Patch Changes
+
+- Updated dependencies [d43447a]
+  - @monolithlabs-hub/wallet-connect-react@1.2.0
+
 ## 0.0.3
 
 ### Patch Changes
