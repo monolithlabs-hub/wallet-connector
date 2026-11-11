@@ -39,11 +39,7 @@ import {
 import bs58 from 'bs58'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import {
-  WalletConnectionError,
-  WalletNotConnectedError,
-  WalletSignMessageError,
-} from '../../errors'
+import { WalletConnectionError, WalletSignMessageError } from '../../errors'
 import type { FlowState } from '../../state/machine'
 import { createWalletManager } from '../../wallet-manager'
 import type { WalletConfig } from '../../wallets/sorter'
@@ -54,6 +50,9 @@ const MAC_DESKTOP_UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 
 const PHANTOM_PUBKEY = '11111111111111111111111111111111'
+// A second account in the SAME wallet — the user switches to it in the
+// extension UI mid-session (real-world repro: Phantom with two accounts).
+const PHANTOM_PUBKEY_B = '7TxCbbRN8KhqFyxap6GnztGUSUSqiBevL7CXLz48FQ4B'
 
 const PHANTOM_CONFIG: WalletConfig = {
   id: 'phantom',
@@ -80,6 +79,8 @@ interface FakeWalletControls {
   signMessageSpy: ReturnType<typeof vi.fn>
   signInSpy: ReturnType<typeof vi.fn>
   disconnectSpy: ReturnType<typeof vi.fn>
+  /** Number of live `standard:events` `change` listeners — leak detection. */
+  changeListenerCount: () => number
 }
 
 function makeAccount(address: string): WalletAccount {
@@ -164,6 +165,7 @@ function makeFakeWallet(
     emitChange(props) {
       for (const listener of [...changeListeners]) listener(props)
     },
+    changeListenerCount: () => changeListeners.size,
   }
 }
 
@@ -373,47 +375,228 @@ describe('Desktop extension connect flow (integration)', () => {
     manager.destroy()
   })
 
-  it('unexpected disconnect (wallet emits change with empty accounts) handled gracefully', async () => {
-    // Establish a connected session.
+  // --- Live session: wallet-side account switch / disconnect ------------
+  //
+  // The fake wallet changes its account MID-SESSION via `emitChange` —
+  // exactly what a real extension does when the user picks another account.
+  // A mock that can't do this would leave these green regardless of the
+  // manager code (see the consumer bug report this suite was written for).
+
+  it('account switch in the wallet updates publicKey and notifies subscribers', async () => {
     const fake = makeFakeWallet({ name: 'Phantom' })
     tracker.register(fake.wallet)
 
     const onConnected = vi.fn()
+    const onAccountChanged = vi.fn()
+    const onWalletDisconnected = vi.fn()
     const manager = createWalletManager({
       wallets: [PHANTOM_CONFIG],
       onConnected,
+      onAccountChanged,
+      onWalletDisconnected,
     })
-
     await manager.connect('phantom')
-    expect(onConnected).toHaveBeenCalledOnce()
-    expect(manager.getState()).toBe('authenticated')
-
-    // Simulate the wallet emitting a `change` event with an empty
-    // accounts list — what happens when the user clicks "Disconnect"
-    // inside the extension's own UI, or revokes the dapp's permission.
-    // The StandardWalletAdapter clears its internal `account` reference;
-    // the manager doesn't subscribe to adapter events (by design — the
-    // adapter is queried lazily for sign operations).
-    fake.emitChange({ accounts: [] })
-
-    // **Design pin**: the manager does NOT observe adapter lifecycle
-    // events. From the FlowMachine's POV, we're still `authenticated`
-    // until the user explicitly calls `manager.disconnect()`. A future
-    // change that wires the manager up to adapter `disconnect` events
-    // would flip the state to `idle` here and trip these assertions —
-    // forcing a conscious decision rather than silent behavior drift.
-    expect(manager.getState()).toBe('authenticated')
     expect(manager.getContext().publicKey).toBe(PHANTOM_PUBKEY)
-    expect(manager.getContext().walletId).toBe('phantom')
 
-    // The disconnected state surfaces only when a downstream operation
-    // reaches the adapter — `requireConnectedStandardAdapter` →
-    // `adapter.signMessage` → adapter's `if (!account) throw
-    // WalletNotConnectedError` path.
-    await expect(manager.signMessage(new Uint8Array([1, 2, 3]))).rejects.toBeInstanceOf(
-      WalletNotConnectedError,
-    )
+    const listener = vi.fn()
+    manager.subscribe(listener)
+
+    fake.emitChange({ accounts: [makeAccount(PHANTOM_PUBKEY_B)] })
+
+    expect(manager.getContext().publicKey).toBe(PHANTOM_PUBKEY_B)
+    expect(manager.getContext().walletId).toBe('phantom')
+    expect(manager.getState()).toBe('authenticated')
+    expect(listener).toHaveBeenCalled()
+    expect(onAccountChanged).toHaveBeenCalledExactlyOnceWith(PHANTOM_PUBKEY_B, PHANTOM_PUBKEY)
+    // Treated as a NEW connection: onConnected fires again with the new key.
+    expect(onConnected).toHaveBeenCalledTimes(2)
+    expect(onConnected).toHaveBeenLastCalledWith(PHANTOM_PUBKEY_B)
+    expect(onWalletDisconnected).not.toHaveBeenCalled()
 
     manager.destroy()
+  })
+
+  it('after an account switch, signing goes out under the account the manager reports', async () => {
+    const fake = makeFakeWallet({ name: 'Phantom' })
+    tracker.register(fake.wallet)
+    const manager = createWalletManager({ wallets: [PHANTOM_CONFIG] })
+    await manager.connect('phantom')
+
+    fake.emitChange({ accounts: [makeAccount(PHANTOM_PUBKEY_B)] })
+    await manager.signMessage(new Uint8Array([1, 2, 3]))
+
+    const signedWith = (fake.signMessageSpy.mock.calls[0]?.[0] as { account: WalletAccount })
+      .account.address
+    expect(signedWith).toBe(manager.getContext().publicKey)
+    expect(signedWith).toBe(PHANTOM_PUBKEY_B)
+
+    manager.destroy()
+  })
+
+  it('account switch with requireSignIn drops the old SIWS signature and lands in `connected`', async () => {
+    const fake = makeFakeWallet({ name: 'Phantom' })
+    tracker.register(fake.wallet)
+
+    const onAuthenticated = vi.fn()
+    const manager = createWalletManager({
+      wallets: [PHANTOM_CONFIG],
+      requireSignIn: true,
+      signInMessage: (pk) => `Sign in as ${pk}`,
+      onAuthenticated,
+    })
+    await manager.connect('phantom')
+    expect(manager.getState()).toBe('authenticated')
+    expect(manager.getContext().signature).toBeTruthy()
+
+    fake.emitChange({ accounts: [makeAccount(PHANTOM_PUBKEY_B)] })
+
+    // The previous account's signature proves nothing about the new one.
+    expect(manager.getState()).toBe('connected')
+    expect(manager.getContext().publicKey).toBe(PHANTOM_PUBKEY_B)
+    expect(manager.getContext().signature).toBeNull()
+    // No unsolicited sign popup: the wallet is NOT asked to sign by itself.
+    expect(fake.signMessageSpy).toHaveBeenCalledOnce()
+
+    // Re-authenticating is an explicit connect() — no new consent prompt
+    // (the adapter is already connected), just the SIWS signature.
+    await manager.connect('phantom')
+    expect(fake.connectSpy).toHaveBeenCalledOnce()
+    expect(manager.getState()).toBe('authenticated')
+    expect(onAuthenticated).toHaveBeenLastCalledWith(PHANTOM_PUBKEY_B, expect.any(String))
+
+    manager.destroy()
+  })
+
+  it('account switch DURING the SIWS signature discards the stale signature', async () => {
+    let resolveSign: ((v: readonly { signature: Uint8Array }[]) => void) | null = null
+    const fake = makeFakeWallet({
+      name: 'Phantom',
+      signMessageImpl: () =>
+        new Promise((resolve) => {
+          resolveSign = resolve
+        }),
+    })
+    tracker.register(fake.wallet)
+
+    const onAuthenticated = vi.fn()
+    const onError = vi.fn()
+    const manager = createWalletManager({
+      wallets: [PHANTOM_CONFIG],
+      requireSignIn: true,
+      onAuthenticated,
+      onError,
+    })
+    const connecting = manager.connect('phantom')
+    await vi.waitFor(() => expect(manager.getState()).toBe('signing'))
+
+    fake.emitChange({ accounts: [makeAccount(PHANTOM_PUBKEY_B)] })
+    expect(manager.getState()).toBe('connected')
+
+    resolveSign!([{ signature: new Uint8Array(64).fill(0x33) }])
+    await connecting
+
+    expect(manager.getState()).toBe('connected')
+    expect(manager.getContext().publicKey).toBe(PHANTOM_PUBKEY_B)
+    expect(manager.getContext().signature).toBeNull()
+    expect(onAuthenticated).not.toHaveBeenCalled()
+    expect(onError).not.toHaveBeenCalled()
+
+    manager.destroy()
+  })
+
+  it('wallet-side disconnect (empty accounts) resets to idle — distinct from an account switch', async () => {
+    const fake = makeFakeWallet({ name: 'Phantom' })
+    tracker.register(fake.wallet)
+
+    const onAccountChanged = vi.fn()
+    const onWalletDisconnected = vi.fn()
+    const manager = createWalletManager({
+      wallets: [PHANTOM_CONFIG],
+      onAccountChanged,
+      onWalletDisconnected,
+    })
+    await manager.connect('phantom')
+
+    fake.emitChange({ accounts: [] })
+
+    expect(manager.getState()).toBe('idle')
+    expect(manager.getContext().publicKey).toBeNull()
+    expect(manager.getContext().walletId).toBeNull()
+    expect(onWalletDisconnected).toHaveBeenCalledOnce()
+    expect(onAccountChanged).not.toHaveBeenCalled()
+
+    // Session is over: a later wallet event must not resurrect it.
+    fake.emitChange({ accounts: [makeAccount(PHANTOM_PUBKEY_B)] })
+    expect(manager.getState()).toBe('idle')
+    expect(onAccountChanged).not.toHaveBeenCalled()
+
+    manager.destroy()
+  })
+
+  it('explicit manager.disconnect() does not fire onWalletDisconnected and stops tracking', async () => {
+    const fake = makeFakeWallet({ name: 'Phantom' })
+    tracker.register(fake.wallet)
+
+    const onAccountChanged = vi.fn()
+    const onWalletDisconnected = vi.fn()
+    const manager = createWalletManager({
+      wallets: [PHANTOM_CONFIG],
+      onAccountChanged,
+      onWalletDisconnected,
+    })
+    await manager.connect('phantom')
+    await manager.disconnect()
+
+    expect(manager.getState()).toBe('idle')
+    expect(onWalletDisconnected).not.toHaveBeenCalled()
+
+    fake.emitChange({ accounts: [makeAccount(PHANTOM_PUBKEY_B)] })
+    expect(manager.getState()).toBe('idle')
+    expect(onAccountChanged).not.toHaveBeenCalled()
+
+    manager.destroy()
+  })
+
+  it('manager.signIn() answered by a different account moves the session to that account', async () => {
+    const fake = makeFakeWallet({
+      name: 'Phantom',
+      withSignIn: true,
+      signInImpl: async () => [
+        {
+          account: makeAccount(PHANTOM_PUBKEY_B),
+          signedMessage: new Uint8Array(0),
+          signature: new Uint8Array(64).fill(0x44),
+        } as SolanaSignInOutput,
+      ],
+    })
+    tracker.register(fake.wallet)
+    const onAccountChanged = vi.fn()
+    const manager = createWalletManager({ wallets: [PHANTOM_CONFIG], onAccountChanged })
+    await manager.connect('phantom')
+
+    const out = await manager.signIn({ domain: 'dapp.example' })
+
+    expect(out.account.address).toBe(PHANTOM_PUBKEY_B)
+    expect(manager.getContext().publicKey).toBe(PHANTOM_PUBKEY_B)
+    expect(onAccountChanged).toHaveBeenCalledExactlyOnceWith(PHANTOM_PUBKEY_B, PHANTOM_PUBKEY)
+
+    manager.destroy()
+  })
+
+  it('destroy() detaches from the wallet — no events after, no leaked listeners', async () => {
+    const fake = makeFakeWallet({ name: 'Phantom' })
+    tracker.register(fake.wallet)
+    const listenersBefore = fake.changeListenerCount()
+
+    const onAccountChanged = vi.fn()
+    const manager = createWalletManager({ wallets: [PHANTOM_CONFIG], onAccountChanged })
+    await manager.connect('phantom')
+    expect(fake.changeListenerCount()).toBeGreaterThan(listenersBefore)
+
+    manager.destroy()
+
+    expect(fake.changeListenerCount()).toBe(listenersBefore)
+    expect(() => fake.emitChange({ accounts: [makeAccount(PHANTOM_PUBKEY_B)] })).not.toThrow()
+    expect(onAccountChanged).not.toHaveBeenCalled()
   })
 })

@@ -146,16 +146,23 @@ const walletItemsDisabled = computed(
 // close timing is unchanged. For `requireSignIn: true` flows the modal
 // stays open through the `signing` state — the user keeps seeing the
 // dialog while their wallet shows a sign prompt.
+//
+// A wallet-side account switch is a NEW connection (the manager replays
+// RESET → connect with the new key) but lands in one scheduler flush, so the
+// state can read `authenticated → authenticated`. Watch the publicKey too.
 let prevState: FlowState = state.value
-watch(state, (curr) => {
+let prevPublicKey: string | null = publicKey.value
+watch([state, publicKey], ([curr, currPublicKey]) => {
   const prev = prevState
+  const prevKey = prevPublicKey
   prevState = curr
+  prevPublicKey = currPublicKey
 
   const wasConnected = isFlowStateConnected(prev)
   const isNowConnected = isFlowStateConnected(curr)
 
-  if (!wasConnected && isNowConnected && publicKey.value) {
-    emit('connected', publicKey.value)
+  if (isNowConnected && currPublicKey && (!wasConnected || prevKey !== currPublicKey)) {
+    emit('connected', currPublicKey)
   }
 
   if (prev !== 'authenticated' && curr === 'authenticated') {

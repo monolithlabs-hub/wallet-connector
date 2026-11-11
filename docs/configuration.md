@@ -151,6 +151,37 @@ Fires when the SIWS signing step completes (`signing → authenticated`). Only f
 
 Fires on any connect-flow error. The error also lands on `manager.getContext().error` and the FlowMachine transitions to `'error'`.
 
+### `onAccountChanged?: (publicKey: string, previousPublicKey: string) => void`
+
+- **Type:** `(publicKey: string, previousPublicKey: string) => void`.
+- **Default:** none.
+- **Example:**
+  ```ts
+  onAccountChanged: (next, prev) => {
+    // Treat as a different user: drop per-account caches / server sessions.
+    queryClient.removeQueries({ queryKey: ['account', prev] })
+  }
+  ```
+
+Fires when the user switches to a different account **inside the connected wallet** (extension / in-app-browser path). The manager treats this as a **new connection**:
+
+- `manager.getContext().publicKey` already holds the new key when the callback fires, and subscribers (`useWallet()`, the Vue composable) re-render with it.
+- Any previous SIWS signature is dropped (`getContext().signature === null`) — it was made by the old account and proves nothing about the new one.
+- `onConnected(newPublicKey)` fires right after this callback (and `<ConnectButton>`'s `onConnected` / `connected` emit fires again).
+- With `requireSignIn: false` the state stays `'authenticated'`. With `requireSignIn: true` it lands in `'connected'`; the manager never opens a sign prompt on its own — call `connect(walletId)` to collect a fresh signature (no new consent popup, just the SIWS signature).
+- A SIWS prompt that was open when the switch happened is discarded when it resolves (no `onAuthenticated`, no `onError`).
+
+Never fires on the mobile deep-link path — there is no live wallet connection to observe there.
+
+### `onWalletDisconnected?: () => void`
+
+- **Type:** `() => void`.
+- **Default:** none.
+
+Fires when the **wallet** ends the session: the user disconnected the site in the extension UI, revoked access, or switched to an account that isn't authorized for this site (the wallet then reports no accounts). The flow is already reset to `'idle'` when it fires. Not fired for your own `manager.disconnect()` call.
+
+> **Signing guard.** Even if a wallet switches accounts without emitting the Wallet Standard `change` event, `signMessage` / `signIn` / `signTransaction` / `signAndSendTransaction` refuse to sign under an account other than `getContext().publicKey` and throw `WalletAccountError` instead.
+
 ## `WalletConfig`
 
 The shape of each entry in `config.wallets`. The library treats `id === pinnedWallet` as the pin target.

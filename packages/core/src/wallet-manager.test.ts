@@ -5,7 +5,12 @@ import type { CallbackResult } from './adapters/callback-handler'
 import type { DeepLinkAdapter } from './adapters/deep-link-adapter'
 import type { StandardWalletAdapter } from './adapters/standard-wallet-adapter'
 import type { DiscoveryHandle } from './discovery'
-import { WalletConnectionError, WalletNotConnectedError, WalletNotReadyError } from './errors'
+import {
+  WalletAccountError,
+  WalletConnectionError,
+  WalletNotConnectedError,
+  WalletNotReadyError,
+} from './errors'
 import type { PlatformInfo } from './platform/detector'
 import type { PendingState } from './session/store'
 import { asWalletName } from './wallet-name'
@@ -1377,6 +1382,20 @@ describe('createWalletManager — signMessage / signIn (desktop)', () => {
     manager.destroy()
 
     await expect(manager.signMessage(new Uint8Array([0]))).rejects.toThrow(/has been destroyed/)
+  })
+  it('refuses to sign when the adapter moved to an account the session was not told about', async () => {
+    // A wallet that switched accounts WITHOUT emitting a standard:events
+    // change: the subscription can't catch it, the pre-sign guard must.
+    const adapter = makeStandardAdapter({ name: 'Phantom', connectPublicKey: 'PK_A' })
+    Object.defineProperty(adapter, 'publicKey', { get: () => 'PK_B' })
+    mocks.discoverStandardWallets.mockReturnValue(makeDiscoveryHandle([adapter]))
+    const manager = createWalletManager({ wallets: [PHANTOM] })
+    await manager.connect('phantom')
+
+    await expect(manager.signMessage(new Uint8Array([0]))).rejects.toThrow(WalletAccountError)
+    await expect(manager.signTransaction(new Uint8Array([0]))).rejects.toThrow(WalletAccountError)
+    expect(adapter.signMessage).not.toHaveBeenCalled()
+    expect(adapter.signTransaction).not.toHaveBeenCalled()
   })
 })
 

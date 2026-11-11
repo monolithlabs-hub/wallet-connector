@@ -305,6 +305,37 @@ describe('StandardWalletAdapter.signIn', () => {
 
     await expect(adapter.signIn()).rejects.toThrow(WalletSignInError)
   })
+
+  it("emits 'accountsChange' when signIn returns a different account than the connected one", async () => {
+    const { wallet } = makeFakeWallet({
+      withSignIn: true,
+      initialAccounts: [makeAccount(PUBKEY_B)],
+    })
+    const adapter = createStandardWalletAdapter(wallet)
+    const listener = vi.fn()
+    adapter.subscribe(listener)
+
+    // Default signInImpl answers with PUBKEY_A — the user picked another
+    // account in the sign-in prompt.
+    await adapter.signIn()
+
+    expect(adapter.publicKey).toBe(PUBKEY_A)
+    expect(listener).toHaveBeenCalledExactlyOnceWith('accountsChange')
+  })
+
+  it('emits nothing when signIn returns the already-connected account', async () => {
+    const { wallet } = makeFakeWallet({
+      withSignIn: true,
+      initialAccounts: [makeAccount(PUBKEY_A)],
+    })
+    const adapter = createStandardWalletAdapter(wallet)
+    const listener = vi.fn()
+    adapter.subscribe(listener)
+
+    await adapter.signIn()
+
+    expect(listener).not.toHaveBeenCalled()
+  })
 })
 
 describe('StandardWalletAdapter.signTransaction', () => {

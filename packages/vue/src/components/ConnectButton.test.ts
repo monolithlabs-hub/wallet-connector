@@ -554,6 +554,24 @@ describe('ConnectButton.vue', () => {
     expect(wrapper.emitted('connected')?.[0]).toEqual(['PK'])
   })
 
+  it('emits connected again when the wallet switches account (state unchanged)', async () => {
+    const mock = makeMockManager({ wallets: [PHANTOM] })
+    const wrapper = mountButton(mock.manager)
+
+    mock.machine.send({ type: 'CONNECT_INITIATED', walletId: 'phantom' })
+    mock.machine.send({ type: 'WALLET_CONNECTED', publicKey: 'PK_A', requireSignIn: false })
+    await nextTick()
+    // WalletManager's account-switch replay, in one tick: Vue's scheduler
+    // only sees authenticated → authenticated.
+    mock.machine.send({ type: 'RESET' })
+    mock.machine.send({ type: 'CONNECT_INITIATED', walletId: 'phantom' })
+    mock.machine.send({ type: 'WALLET_CONNECTED', publicKey: 'PK_B', requireSignIn: false })
+    await nextTick()
+
+    expect(wrapper.emitted('connected')).toHaveLength(2)
+    expect(wrapper.emitted('connected')?.[1]).toEqual(['PK_B'])
+  })
+
   it('emits authenticated with publicKey and signature on the authenticated transition', async () => {
     const mock = makeMockManager({ wallets: [PHANTOM] })
     const wrapper = mountButton(mock.manager)

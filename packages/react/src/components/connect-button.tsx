@@ -119,16 +119,27 @@ export function ConnectButton({
   // Auto-closes on the `authenticated` transition rather than `connected`
   // so requireSignIn flows keep the dialog visible through the signing
   // step (see TASK-203 review).
+  //
+  // A wallet-side account switch is a NEW connection (the manager replays
+  // RESET → connect with the new key), but React batches that replay, so the
+  // state can read `authenticated → authenticated`. Track the publicKey too.
   const prevStateRef = useRef<FlowState>(wallet.state)
+  const prevPublicKeyRef = useRef<string | null>(wallet.publicKey)
   useEffect(() => {
     const prev = prevStateRef.current
     const curr = wallet.state
+    const prevPublicKey = prevPublicKeyRef.current
     prevStateRef.current = curr
+    prevPublicKeyRef.current = wallet.publicKey
 
     const wasConnected = isFlowStateConnected(prev)
     const isNowConnected = isFlowStateConnected(curr)
 
-    if (!wasConnected && isNowConnected && wallet.publicKey) {
+    if (
+      isNowConnected &&
+      wallet.publicKey &&
+      (!wasConnected || prevPublicKey !== wallet.publicKey)
+    ) {
       onConnected?.(wallet.publicKey)
     }
 

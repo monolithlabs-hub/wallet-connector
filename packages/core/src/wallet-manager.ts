@@ -8,9 +8,13 @@ import bs58 from 'bs58'
 
 import { createDeepLinkAdapter, type DeepLinkAdapter } from './adapters/deep-link-adapter'
 import type { SolanaCluster } from './adapters/deep-link-builder'
-import type { StandardWalletAdapter } from './adapters/standard-wallet-adapter'
+import type {
+  StandardAdapterEvent,
+  StandardWalletAdapter,
+} from './adapters/standard-wallet-adapter'
 import { discoverStandardWallets, type DiscoveryHandle } from './discovery'
 import {
+  WalletAccountError,
   WalletConnectionError,
   WalletError,
   WalletNotConnectedError,
@@ -98,6 +102,27 @@ export interface WalletManagerConfig {
   onAuthenticated?: (publicKey: string, signature: string) => void
   /** Fires on any connect-flow error. */
   onError?: (error: WalletError) => void
+  /**
+   * Fires when the user switches to a different account INSIDE the connected
+   * wallet (extension / in-app-browser path). The manager treats this as a
+   * **new connection**: `getContext().publicKey` is already the new key,
+   * any previous SIWS signature is dropped, and {@link onConnected} fires
+   * again right after this callback. With `requireSignIn: true` the flow
+   * lands in `'connected'` (not `'authenticated'`) — call
+   * `connect(walletId)` to collect a fresh signature; the manager never
+   * opens a sign prompt on its own.
+   *
+   * Never fires on the mobile deep-link path (no live wallet connection).
+   */
+  onAccountChanged?: (publicKey: string, previousPublicKey: string) => void
+  /**
+   * Fires when the WALLET ends the session — the user disconnected the site
+   * in the extension UI, revoked access, or switched to an account that
+   * isn't authorized for this site (the wallet reports no accounts). The
+   * flow is already reset to `'idle'` when this fires. NOT fired for the
+   * dapp's own {@link WalletManager.disconnect} call.
+   */
+  onWalletDisconnected?: () => void
 }
 
 export interface WalletManager {
@@ -134,7 +159,11 @@ export interface WalletManager {
    * {@link destroy}.
    */
   connect(walletId: string): Promise<void>
-  /** Clear local session state. Emits `'disconnect'` to subscribers if previously connected. Throws after {@link destroy}. */
+  /**
+   * Clear local session state and stop tracking wallet-side account events.
+   * Does NOT fire {@link WalletManagerConfig.onWalletDisconnected}. Throws
+   * after {@link destroy}.
+   */
   disconnect(): Promise<void>
   /**
    * Sign an arbitrary message with the currently-connected wallet. Only
@@ -323,6 +352,65 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
   let inflightConnect: Promise<void> | null = null
   let inflightWalletId: string | null = null
 
+  // --- Live session tracking (extension path) ---------------------------
+  //
+  // While a session is connected, the manager listens to the active
+  // StandardWalletAdapter's lifecycle events so a wallet-side account switch
+  // or disconnect is reflected in the FlowMachine immediately. Without this
+  // the adapter silently moves to the new account (and signs with it) while
+  // `getContext().publicKey` keeps reporting the old one.
+  let activeAdapter: StandardWalletAdapter | null = null
+  let unsubscribeActiveAdapter: (() => void) | null = null
+  // Bumped whenever the current session is superseded (account switch,
+  // wallet-side disconnect, explicit disconnect). An in-flight SIWS step
+  // compares against it after its await so a signature collected for a
+  // stale session is discarded instead of being applied to the new one.
+  let sessionEpoch = 0
+
+  function detachActiveAdapter(): void {
+    if (unsubscribeActiveAdapter) unsubscribeActiveAdapter()
+    unsubscribeActiveAdapter = null
+    activeAdapter = null
+  }
+
+  function attachActiveAdapter(adapter: StandardWalletAdapter): void {
+    detachActiveAdapter()
+    activeAdapter = adapter
+    unsubscribeActiveAdapter = adapter.subscribe((event) => handleAdapterEvent(adapter, event))
+  }
+
+  function handleAdapterEvent(adapter: StandardWalletAdapter, event: StandardAdapterEvent): void {
+    if (destroyed || adapter !== activeAdapter) return
+    // Only a live session can be switched or ended. In `'error'` (e.g. the
+    // user rejected the SIWS prompt) there is nothing to update.
+    const state = machine.getState()
+    if (state !== 'connected' && state !== 'signing' && state !== 'authenticated') return
+
+    if (event === 'disconnect') {
+      sessionEpoch += 1
+      detachActiveAdapter()
+      machine.send({ type: 'RESET' })
+      safeCallback(config.onWalletDisconnected)
+      return
+    }
+    if (event !== 'accountsChange') return
+
+    const ctx = machine.getContext()
+    const next = adapter.publicKey
+    const prev = ctx.publicKey
+    const walletId = ctx.walletId
+    if (!next || !prev || !walletId || next === prev) return
+
+    // New connection under the new account: RESET drops the old SIWS
+    // signature, then replay connect so subscribers observe the new key.
+    sessionEpoch += 1
+    machine.send({ type: 'RESET' })
+    machine.send({ type: 'CONNECT_INITIATED', walletId })
+    machine.send({ type: 'WALLET_CONNECTED', publicKey: next, requireSignIn })
+    safeCallback(config.onAccountChanged, next, prev)
+    safeCallback(config.onConnected, next)
+  }
+
   function assertAlive(): void {
     if (destroyed) throw new Error('WalletManager has been destroyed')
   }
@@ -433,6 +521,7 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
     // so a previous flow that ended in 'error', 'authenticated', etc.
     // would crash the second `connect()`. RESET kicks any non-idle state
     // back to 'idle' first (clears context too, per TASK-104).
+    detachActiveAdapter()
     if (machine.getState() !== 'idle') {
       machine.send({ type: 'RESET' })
     }
@@ -506,6 +595,8 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
     }
 
     machine.send({ type: 'WALLET_CONNECTED', publicKey, requireSignIn })
+    attachActiveAdapter(adapter)
+    const epoch = sessionEpoch
     safeCallback(config.onConnected, publicKey)
     saveLastUsedWallet(walletConfig.id)
 
@@ -519,9 +610,16 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
       const signatureBytes = await adapter.signMessage(new Uint8Array(messageBytes))
       signatureB58 = bs58.encode(signatureBytes)
     } catch (err) {
+      // Session superseded while the prompt was open (account switch,
+      // wallet-side or explicit disconnect): the FlowMachine already reflects
+      // the new reality; don't overwrite it with an error for the old one.
+      if (epoch !== sessionEpoch) return
       throw reportError(err)
     }
 
+    // Same: a signature from a superseded session proves nothing about the
+    // current account — drop it.
+    if (epoch !== sessionEpoch) return
     machine.send({ type: 'SIGN_COMPLETED', signature: signatureB58 })
     safeCallback(config.onAuthenticated, publicKey, signatureB58)
   }
@@ -664,6 +762,15 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
         `Wallet '${walletConfig.name}' is no longer registered with the Wallet Standard registry`,
       )
     }
+    // Last-line guard: never sign under an account other than the one the
+    // dapp was told about. The adapter-event subscription normally keeps
+    // these in sync; this catches anything that slipped past it (a wallet
+    // that switched accounts without emitting `standard:events` change).
+    if (adapter.publicKey && ctx.publicKey && adapter.publicKey !== ctx.publicKey) {
+      throw new WalletAccountError(
+        `Wallet '${walletConfig.name}' is now on account ${adapter.publicKey}, but this session was connected as ${ctx.publicKey}. Reconnect before signing.`,
+      )
+    }
     return adapter
   }
 
@@ -707,6 +814,10 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
 
   async function disconnect(): Promise<void> {
     assertAlive()
+    // Stop tracking BEFORE asking the wallet to disconnect, so the adapter's
+    // own 'disconnect' event isn't mistaken for a wallet-initiated one.
+    sessionEpoch += 1
+    detachActiveAdapter()
     if (platform.strategy === 'extension') {
       const ctx = machine.getContext()
       if (ctx.walletId) {
@@ -778,6 +889,7 @@ export function createWalletManager(config: WalletManagerConfig): WalletManager 
       if (destroyed) return
       destroyed = true
       unsubscribeStateChange()
+      detachActiveAdapter()
       if (unsubscribeDiscovery) unsubscribeDiscovery()
       if (removeReturnListeners) removeReturnListeners()
       listeners.clear()

@@ -567,6 +567,27 @@ describe('ConnectButton', () => {
     expect(onConnected).toHaveBeenCalledWith('PK')
   })
 
+  it('fires onConnected again when the wallet switches account (state unchanged)', () => {
+    const mock = makeMockManager({ wallets: [PHANTOM] })
+    const onConnected = vi.fn()
+    render(<ConnectButton onConnected={onConnected} />, { wrapper: wrap(mock.manager) })
+
+    act(() => {
+      mock.machine.send({ type: 'CONNECT_INITIATED', walletId: 'phantom' })
+      mock.machine.send({ type: 'WALLET_CONNECTED', publicKey: 'PK_A', requireSignIn: false })
+    })
+    // What WalletManager does on a wallet-side account switch — all in one
+    // tick, so React batches it and only sees authenticated → authenticated.
+    act(() => {
+      mock.machine.send({ type: 'RESET' })
+      mock.machine.send({ type: 'CONNECT_INITIATED', walletId: 'phantom' })
+      mock.machine.send({ type: 'WALLET_CONNECTED', publicKey: 'PK_B', requireSignIn: false })
+    })
+
+    expect(onConnected).toHaveBeenCalledTimes(2)
+    expect(onConnected).toHaveBeenLastCalledWith('PK_B')
+  })
+
   it('fires onAuthenticated with publicKey and signature on the authenticated transition', () => {
     const mock = makeMockManager({ wallets: [PHANTOM] })
     const onAuthenticated = vi.fn()

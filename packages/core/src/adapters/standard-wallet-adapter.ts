@@ -290,9 +290,14 @@ export function createStandardWalletAdapter(wallet: Wallet): StandardWalletAdapt
     // `wallet.accounts` — a spec-compliant wallet emits `change` with the
     // new account list immediately after, keeping the two consistent.
     const wasConnected = isConnected
+    const prevAddress = account?.address ?? null
     account = output.account
     isConnected = true
     if (!wasConnected) emit('connect')
+    // The user may pick a different account in the sign-in prompt. Emit
+    // here: the wallet's follow-up `change` event will see no difference
+    // (we already moved `account`) and stay silent.
+    else if (output.account.address !== prevAddress) emit('accountsChange')
     return output
   }
 
